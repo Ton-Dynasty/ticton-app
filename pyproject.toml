@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "ticon-app-webhook"
+version = "0.1.0"
+description = ""
+authors = ["alan890104 <alan890104@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10"
+fastapi = {extras = ["all"], version = "^0.109.0"}
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+typer = {extras = ["all"], version = "^0.9.0"}
+pymongo = "^4.6.1"
+python-dotenv = "^1.0.1"
+pytonconnect = "^0.3.0"
+python-jose = "^3.3.0"
+tonsdk = "^1.0.13"
+
+
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
