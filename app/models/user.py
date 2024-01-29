@@ -7,10 +7,8 @@ class User(BaseModel):
     id: ObjectId = Field(alias="_id")
     telegram_id: int = Field(description="telegram user id")
     telegram_name: str = Field(description="telegram user name")
-    wallet: Optional[str] = Field(description="wallet address in uesr friendly format")
-    balances: Dict[str, float] = Field(
-        description="user balances in different assets", default={}
-    )
+    wallet: str = Field(description="wallet address in uesr friendly format")
+    balances: Optional[Dict[str, float]] = Field(None, description="user balances in different assets")
 
     class Config:
         populate_by_name = True
@@ -24,8 +22,11 @@ class User(BaseModel):
         }
 
 
-class UserRegister(BaseModel):
-    wallet: str = Field(description="wallet address in uesr friendly format")
-    wallet_type: Literal[
-        "telegram-wallet", "tonkeeper", "mytonwallet", "tonhub"
-    ] = Field(..., description="wallet type")
+class IUser(BaseModel):
+    telegram_id: int = Field(description="telegram user id")
+    telegram_name: str = Field(description="telegram user name")
+    wallet: str = Field(None, description="wallet address in uesr friendly format")
+
+
+class UserRegisterRequest(BaseModel):
+    wallet_type: Literal["telegram-wallet", "tonkeeper", "mytonwallet", "tonhub"] = Field(..., description="wallet type")

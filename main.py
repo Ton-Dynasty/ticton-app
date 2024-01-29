@@ -1,4 +1,5 @@
 import asyncio
+import fastapi
 import typer
 from typer import Typer
 from fastapi import FastAPI

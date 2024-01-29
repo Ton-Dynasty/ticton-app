@@ -5,15 +5,15 @@ import hashlib
 from fastapi import Header, HTTPException, Depends
 from app.models.telegram import TelegramUser
 from app.settings import get_settings, Settings
+from typing import Annotated
+from urllib.parse import unquote
 
 
 async def verify_tg_token(
-    x_auth_date: int = Header(...),
-    x_query_id: str = Header(...),
-    x_user: str = Header(...),
-    x_hash: str = Header(...),
+    x_hash: Annotated[str, Header()],
+    authorization: Annotated[str, Header()],
     settings: Settings = Depends(get_settings),
-):
+) -> TelegramUser:
     """
     https://core.telegram.org/bots/webapps#validating-data-received-via-the-mini-app
 
@@ -33,14 +33,19 @@ async def verify_tg_token(
     user: User identifier, json string.
     hash: Hash for the authorization token.
     """
+    tma = authorization.split(" ")
+    if len(tma) != 2:
+        raise HTTPException(status_code=401, detail="Header is not valid")
     bot_token = settings.TICTON_TG_BOT_TOKEN
-    data_check_string = f"auth_date={x_auth_date}\nquery_id={x_query_id}\nuser={x_user}"
-    secret_key = hmac.new(
-        bytes("WebAppData", "utf-8"), bytes(bot_token, "utf-8"), hashlib.sha256
-    )
-    _hash = hmac.new(
-        secret_key.digest(), bytes(data_check_string, "utf-8"), hashlib.sha256
-    ).hexdigest()
-    if _hash != x_hash:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-    return TelegramUser(**json.loads(x_user))
+    if tma[0] != "tma":
+        raise HTTPException(status_code=401, detail="Authorization header should start with tma")
+    init_data = unquote(tma[1])
+    init_data_sorted = sorted([chunk.split("=") for chunk in init_data.split("&") if chunk[: len("hash=")] != "hash="], key=lambda x: x[0])
+    init_data_sorted = "\n".join([f"{rec[0]}={rec[1]}" for rec in init_data_sorted])
+    secret_key = hmac.new("WebAppData".encode(), bot_token.encode(), hashlib.sha256).digest()
+    data_check = hmac.new(secret_key, init_data_sorted.encode(), hashlib.sha256)
+    if data_check.hexdigest() != x_hash:
+        raise HTTPException(status_code=401, detail="Hash is not valid")
+    init_data_dict = dict([chunk.split("=") for chunk in init_data.split("&")])
+    user = json.loads(init_data_dict["user"])
+    return TelegramUser(**user)
