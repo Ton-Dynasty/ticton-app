@@ -8,7 +8,7 @@ import os
 import uvicorn
 from contextlib import asynccontextmanager
 from app.dao import get_db
-from app.api import UserRouter, StrategyRouter
+from app.api import UserRouter, StrategyRouter, CoreRouter
 from dotenv import load_dotenv
 
 from fastapi import Depends
@@ -52,6 +52,7 @@ app.add_middleware(
 app.dependency_overrides[get_db] = get_db
 app.include_router(UserRouter)
 app.include_router(StrategyRouter)
+app.include_router(CoreRouter)
 
 
 @cli.command(name="init")
