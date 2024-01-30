@@ -41,6 +41,53 @@ async def create_position(
         return JSONResponse(
             status_code=status.HTTP_201_CREATED, content={"message": "Success"}
         )
+
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
+
+
+@CoreRouter.put("")
+async def close_position(
+    position_id: str,
+    manager: DatabaseManager = Depends(get_db),
+    tg_user: TelegramUser = Depends(verify_tg_token),
+):
+    try:
+        # check if position exists
+        result = manager.db["positions"].find_one(
+            {"id": position_id, "telegram_id": tg_user.id}
+        )
+        if result is None:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"message": "Position not found"},
+            )
+        # check if position is active
+        pos = Position(**result)
+        if pos.status == False:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Position already closed"},
+            )
+
+        # TODO: Ring the position
+
+        result = manager.db["positions"].update_one(
+            {"id": position_id, "telegram_id": tg_user.id}, {"$set": {"status": False}}
+        )
+        print(result)
+        # if result nModified == 0, means no document is updated
+        if result.modified_count == 0:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content={"message": "Position not found"},
+            )
+        return JSONResponse(
+            status_code=status.HTTP_200_OK, content={"message": "Success"}
+        )
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
