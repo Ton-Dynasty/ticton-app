@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends
 from fastapi import status, BackgroundTasks
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -7,7 +7,7 @@ from fastapi.encoders import jsonable_encoder
 from pytonconnect import TonConnect
 from app.dao import DatabaseManager, get_db
 from app.models.telegram import TelegramUser
-from app.models.user import IUser, UserRegisterRequest, User
+from app.models.user import IUser, UserRegisterRequest, User, WithdrawReqeuest
 from app.api.middleware.auth import verify_tg_token
 from app.utils import generate_tonproof_payload, verify_tonproof_payload
 from app.settings import get_settings, Settings
@@ -52,6 +52,7 @@ async def reigster(
                         wallet=addr,
                     )
                     result = manager.db["users"].insert_one(u.model_dump())
+                    print(result)
                     print(f"User {payload.telegram_id} registered with address {addr}")
 
         def on_error(err):
@@ -67,7 +68,7 @@ async def reigster(
         return JSONResponse(content={"url": generated_url}, status_code=status.HTTP_200_OK, background=bg_tasks)
     except Exception as e:
         print(e)
-        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"message": str(e)})
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
 
 
 @UserRouter.get(
@@ -79,10 +80,19 @@ async def get_user_by_id(manager: DatabaseManager = Depends(get_db)):
     raise NotImplementedError
 
 
-@UserRouter.get("")
+@UserRouter.get("", response_model=List[User], description="List all users")
 async def list_users(manager: DatabaseManager = Depends(get_db)):
-    output = manager.db["users"].find()
-    return JSONResponse(
-        status_code=status.HTTP_200_OK,
-        content=jsonable_encoder(list(output)),
-    )
+    try:
+        output = [User(**x) for x in manager.db["users"].find()]
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content=jsonable_encoder(output),
+        )
+    except Exception as e:
+        print(e)
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
+
+
+@UserRouter.get("/withdraw", description="withdraw user balance")
+async def withdraw(req: WithdrawReqeuest, manager: DatabaseManager = Depends(get_db)):
+    raise NotImplementedError

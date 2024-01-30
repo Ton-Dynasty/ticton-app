@@ -35,9 +35,11 @@ async def verify_tg_token(
     """
     tma = authorization.split(" ")
     if len(tma) != 2:
+        print("Authorization header is not valid")
         raise HTTPException(status_code=401, detail="Header is not valid")
     bot_token = settings.TICTON_TG_BOT_TOKEN
     if tma[0] != "tma":
+        print("Authorization header should start with tma")
         raise HTTPException(status_code=401, detail="Authorization header should start with tma")
     init_data = unquote(tma[1])
     init_data_sorted = sorted([chunk.split("=") for chunk in init_data.split("&") if chunk[: len("hash=")] != "hash="], key=lambda x: x[0])
@@ -45,6 +47,7 @@ async def verify_tg_token(
     secret_key = hmac.new("WebAppData".encode(), bot_token.encode(), hashlib.sha256).digest()
     data_check = hmac.new(secret_key, init_data_sorted.encode(), hashlib.sha256)
     if data_check.hexdigest() != x_hash:
+        print("Hash is not valid")
         raise HTTPException(status_code=401, detail="Hash is not valid")
     init_data_dict = dict([chunk.split("=") for chunk in init_data.split("&")])
     user = json.loads(init_data_dict["user"])
