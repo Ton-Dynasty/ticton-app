@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import Literal
 
 
 class Settings(BaseSettings):
@@ -10,6 +11,7 @@ class Settings(BaseSettings):
     TICTON_DB_NAME: str
     TICTON_TG_BOT_TOKEN: str
     TICTON_MANIFEST_URL: str
+    TICTON_MODE: Literal["dev", "main"]
 
 
 @lru_cache()

@@ -33,6 +33,17 @@ async def verify_tg_token(
     user: User identifier, json string.
     hash: Hash for the authorization token.
     """
+    if settings.TICTON_MODE == "dev":
+        return TelegramUser(
+            allows_write_to_pm=True,
+            first_name="Test",
+            id=123456789,
+            is_premium=None,
+            language_code="zh-TW",
+            last_name="Test",
+            username="Test",
+        )
+
     tma = authorization.split(" ")
     if len(tma) != 2:
         print("Authorization header is not valid")
@@ -40,11 +51,22 @@ async def verify_tg_token(
     bot_token = settings.TICTON_TG_BOT_TOKEN
     if tma[0] != "tma":
         print("Authorization header should start with tma")
-        raise HTTPException(status_code=401, detail="Authorization header should start with tma")
+        raise HTTPException(
+            status_code=401, detail="Authorization header should start with tma"
+        )
     init_data = unquote(tma[1])
-    init_data_sorted = sorted([chunk.split("=") for chunk in init_data.split("&") if chunk[: len("hash=")] != "hash="], key=lambda x: x[0])
+    init_data_sorted = sorted(
+        [
+            chunk.split("=")
+            for chunk in init_data.split("&")
+            if chunk[: len("hash=")] != "hash="
+        ],
+        key=lambda x: x[0],
+    )
     init_data_sorted = "\n".join([f"{rec[0]}={rec[1]}" for rec in init_data_sorted])
-    secret_key = hmac.new("WebAppData".encode(), bot_token.encode(), hashlib.sha256).digest()
+    secret_key = hmac.new(
+        "WebAppData".encode(), bot_token.encode(), hashlib.sha256
+    ).digest()
     data_check = hmac.new(secret_key, init_data_sorted.encode(), hashlib.sha256)
     if data_check.hexdigest() != x_hash:
         print("Hash is not valid")
