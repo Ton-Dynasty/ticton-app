@@ -5,13 +5,13 @@ import hashlib
 from fastapi import Header, HTTPException, Depends
 from app.models.telegram import TelegramUser
 from app.settings import get_settings, Settings
-from typing import Annotated
+from typing import Annotated, Optional
 from urllib.parse import unquote
 
 
 async def verify_tg_token(
-    x_hash: Annotated[str, Header()],
-    authorization: Annotated[str, Header()],
+    x_hash: Annotated[Optional[str], Header()] = None,
+    authorization: Annotated[Optional[str], Header()] = None,
     settings: Settings = Depends(get_settings),
 ) -> TelegramUser:
     """
