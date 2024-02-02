@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -7,13 +8,13 @@ class StrategyPairs(BaseModel):
     quote_asset: str = Field(description="quote asset address")
 
 
-class StrategyModel(BaseModel):
+class Strategy(BaseModel):
     name: str = Field(description="Strategy name")
     description: str = Field(description="Strategy description")
     provider: str = Field(description="Strategy provider")
     acc_rewards: float = Field(description="Accumulated rewards in TIC token")
     fee_rate: float = Field(0, description="Fee rate in percentage, incurs when user withdraws rewards")
-    strategy_pairs: Optional[List[StrategyPairs]] = Field(None, description="Strategy pairs")
+    pairs: Optional[List[StrategyPairs]] = Field(None, description="Strategy pairs")
 
 
 class Price(BaseModel):
@@ -23,3 +24,4 @@ class Price(BaseModel):
     quote_asset_address: str = Field(description="quote asset address")
     quote_asset_symbol: str = Field(description="quote asset symbol")
     price: float = Field(description="relative price of quote asset to base asset, e.g. 2.5 for 2.5 USDT per TON")
+    updated_at: datetime = Field(description="price updated time in RFC3339 format")

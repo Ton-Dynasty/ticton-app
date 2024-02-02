@@ -11,7 +11,6 @@ from app.dao import get_db
 from app.api import UserRouter, StrategyRouter, CoreRouter
 from dotenv import load_dotenv
 
-from fastapi import Depends
 from app.settings import get_settings
 
 
