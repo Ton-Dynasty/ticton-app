@@ -97,23 +97,29 @@ async def create_provider(request: CreateProviderRequest, manager: DatabaseManag
 async def get_price(
     provider_id: str,
     pair_id: str,
-    manager: DatabaseManager,
+    manager: DatabaseManager = Depends(get_db),
     cache: CacheManager = Depends(get_cache),
 ):
-    provider = manager.db["providers"].find_one({"id": provider_id})
-    if provider is None:
+    try:
+        provider = manager.db["providers"].find_one({"id": provider_id})
+        if provider is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Provider not found"},
+            )
+        provider = Provider(**provider)
+        resp = await cache.client.get(f"price:{provider_id}:{pair_id}")
+        if resp is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Price not found"},
+            )
+        return PriceResponse(**json.loads(resp))
+    except Exception as e:
         return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Provider not found"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
         )
-    provider = Provider(**provider)
-    resp = await cache.client.get(f"price:{provider_id}:{pair_id}")
-    if resp is None:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Price not found"},
-        )
-    return PriceResponse(**json.loads(resp))
 
 
 @ProviderRouter.put("/price", description="Update price of a pair in a provider")
@@ -124,31 +130,37 @@ async def update_price(
     cache: CacheManager = Depends(get_cache),
     settings: Settings = Depends(get_settings),
 ):
-    if settings.TICTON_MODE != "dev":
-        return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"message": "Forbidden"})
+    try:
+        if settings.TICTON_MODE != "dev":
+            return JSONResponse(status_code=status.HTTP_403_FORBIDDEN, content={"message": "Forbidden"})
 
-    # check if every pair in info.pairs is in collection
-    result = manager.db["pairs"].find({"id": {"$in": [x.pair_id for x in infos]}})
-    if result.modified_count == 0:
+        # check if every pair in info.pairs is in collection
+        result = manager.db["pairs"].find({"id": {"$in": [x.pair_id for x in infos]}})
+        if result.modified_count == 0:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Pair not found"},
+            )
+
+        # get provider from mongodb
+        provider = Provider(**manager.db["providers"].find_one({"id": provider_id}))
+        if provider is None:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content={"message": "Provider not found"},
+            )
+
+        # update price in redis
+        for info in infos:
+            # find info.pair_id in collections
+            p = manager.db["pairs"].find_one({"id": info.pair_id})
+            if p is None:
+                continue
+            pair = Pair(**p)
+            cache.client.set(f"price:{provider_id}:{pair.id}", PriceResponse(price=info.price, timestamp=datetime.now()).model_dump_json())
+            cache.client.set(f"price:debug:{provider.name}:{pair.base_asset_symbol}/{pair.quote_asset_symbol}", info.price)
+    except Exception as e:
         return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Pair not found"},
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
         )
-
-    # get provider from mongodb
-    provider = Provider(**manager.db["providers"].find_one({"id": provider_id}))
-    if provider is None:
-        return JSONResponse(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            content={"message": "Provider not found"},
-        )
-
-    # update price in redis
-    for info in infos:
-        # find info.pair_id in collections
-        p = manager.db["pairs"].find_one({"id": info.pair_id})
-        if p is None:
-            continue
-        pair = Pair(**p)
-        cache.client.set(f"price:{provider_id}:{pair.id}", PriceResponse(price=info.price, timestamp=datetime.now()).model_dump_json())
-        cache.client.set(f"price:debug:{provider.name}:{pair.base_asset_symbol}/{pair.quote_asset_symbol}", info.price)
