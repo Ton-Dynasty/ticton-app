@@ -45,6 +45,7 @@ class Position(BaseModel):
         None,
         description="Reward of position, in human readable format. Only available if position is closed",
     )
+    alarm_id: Optional[int] = Field(None, description="Alarm id of position.")
 
     class Config:
         populate_by_name = True

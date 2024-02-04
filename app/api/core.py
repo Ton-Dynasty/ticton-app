@@ -6,6 +6,7 @@ from fastapi.encoders import jsonable_encoder
 from typing import List
 from app.models.telegram import TelegramUser
 from app.api.middleware.auth import verify_tg_token
+from ticton import TicTonAsyncClient
 
 CoreRouter = APIRouter(prefix="/core", tags=["core"])
 
@@ -74,6 +75,10 @@ async def close_position(
             )
 
         # TODO: Ring the position
+        pair = manager.db["pairs"].find_one({"id": pos.pair_id})
+        oracle_address = pair.get("oracle_address")
+        client = await TicTonAsyncClient.init(oracle_addr=oracle_address)
+        await client.ring(alarm_id=pos.alarm_id)
 
         result = manager.db["positions"].update_one(
             {"id": position_id, "telegram_id": tg_user.id}, {"$set": {"status": False}}
