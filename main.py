@@ -1,4 +1,5 @@
 import asyncio
+from enum import unique
 import fastapi
 import typer
 from typer import Typer
@@ -8,7 +9,7 @@ import os
 import uvicorn
 from contextlib import asynccontextmanager
 from app.dao import get_db
-from app.api import UserRouter, StrategyRouter, CoreRouter
+from app.api import UserRouter, ProviderRouter, CoreRouter
 from dotenv import load_dotenv
 
 from app.settings import get_settings
@@ -50,7 +51,7 @@ app.add_middleware(
 )
 app.dependency_overrides[get_db] = get_db
 app.include_router(UserRouter)
-app.include_router(StrategyRouter)
+app.include_router(ProviderRouter)
 app.include_router(CoreRouter)
 
 
@@ -67,6 +68,7 @@ def init():
             db_name=settings.TICTON_DB_NAME,
         )
         manager.db["users"].create_index("telegram_id", unique=True)
+        manager.db["pairs"].create_index("oracle_address", unique=True)
 
     typer.echo("Initializing database")
     asyncio.run(setup())

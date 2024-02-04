@@ -19,3 +19,8 @@ class DatabaseManager(metaclass=ABCMeta):
     @abstractmethod
     def disconnect(self):
         raise NotImplementedError
+
+
+class RedisManager(metaclass=ABCMeta):
+    def __init__(self) -> None:
+        pass

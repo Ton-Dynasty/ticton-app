@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -6,3 +7,4 @@ class Asset(BaseModel):
     symbol: str = Field(description="asset symbol, e.g. USDT")
     decimals: int = Field(description="asset decimals, e.g. 6")
     balance: int = Field(description="asset balance in minimal units, e.g. 1,000,000 for 1 USDT")
+    image: Optional[str] = Field(description="asset icon")

@@ -74,7 +74,7 @@ async def reigster(
 @UserRouter.get(
     "/{telegram_id}",
     response_model=User,
-    description="Get user by telegram id",
+    description="Get user by telegram id, balance field contains jettons, TON and reward token",
 )
 async def get_user_by_id(manager: DatabaseManager = Depends(get_db)):
     raise NotImplementedError
