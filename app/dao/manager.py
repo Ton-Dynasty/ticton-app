@@ -21,6 +21,16 @@ class DatabaseManager(metaclass=ABCMeta):
         raise NotImplementedError
 
 
-class RedisManager(metaclass=ABCMeta):
-    def __init__(self) -> None:
-        pass
+class CacheManager(metaclass=ABCMeta):
+    @property
+    @abstractmethod
+    def client(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def connect(self, host: str, port: int, username: str, password: str, db: int):
+        raise NotImplementedError
+
+    @abstractmethod
+    def disconnect(self):
+        raise NotImplementedError
