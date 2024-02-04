@@ -6,6 +6,7 @@ from app.dao import DatabaseManager, get_db
 from app.models.core import CreatePairRequest, Pair
 from app.models.provider import Provider, CreateProviderRequest, PriceResponse
 from fastapi.encoders import jsonable_encoder
+from ticton import TicTonAsyncClient
 
 
 ProviderRouter = APIRouter(prefix="/provider", tags=["provider"])
@@ -16,7 +17,17 @@ ProviderRouter = APIRouter(prefix="/provider", tags=["provider"])
 )
 async def get_pairs(db: DatabaseManager = Depends(get_db)):
     # TODO: get pairs from mongodb
-    pass
+    try:
+        result = db.db["pairs"].find()
+        result = [Pair(**i) for i in result]
+        return JSONResponse(
+            status_code=status.HTTP_200_OK, content=jsonable_encoder(result)
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
 
 
 @ProviderRouter.post("/pairs", description="Add new pair")
@@ -24,8 +35,31 @@ async def create_pair(
     request: CreatePairRequest, db: DatabaseManager = Depends(get_db)
 ):
     # TODO: only ton dynasty can create pair
-    # TODO: call tic ton sdk to create pair
-    pass
+    try:
+        # TODO: call tic ton sdk to create pair
+        client = await TicTonAsyncClient.init(oracle_addr=request.oracle_address)
+
+        print(client.metadata)
+
+        pair = Pair(
+            oracle_address=request.oracle_address,
+            base_asset_address=client.metadata["base_asset_address"].to_string(),
+            quote_asset_address=client.metadata["quote_asset_address"].to_string(),
+            base_asset_symbol=client.metadata["base_asset_symbol"],
+            quote_asset_symbol=client.metadata["quote_asset_symbol"],
+            base_asset_decimals=client.metadata["base_asset_decimals"],
+            quote_asset_decimals=client.metadata["quote_asset_decimals"],
+        )
+        result = db.db["pairs"].insert_one(pair.model_dump())
+        print(result)
+        return JSONResponse(
+            status_code=status.HTTP_201_CREATED, content={"message": "Success"}
+        )
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
 
 
 @ProviderRouter.get(
