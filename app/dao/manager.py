@@ -1,5 +1,7 @@
 from abc import ABCMeta, abstractmethod
 
+import redis
+
 
 class DatabaseManager(metaclass=ABCMeta):
     @property
@@ -24,7 +26,7 @@ class DatabaseManager(metaclass=ABCMeta):
 class CacheManager(metaclass=ABCMeta):
     @property
     @abstractmethod
-    def client(self):
+    def client(self) -> redis.Redis:
         raise NotImplementedError
 
     @abstractmethod

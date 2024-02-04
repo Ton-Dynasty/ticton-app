@@ -20,6 +20,11 @@ class Provider(BaseModel):
     pairs: List[Pair] = Field(description="List of pairs that provider is providing strategy for")
 
 
+class UpdatePriceRequest(BaseModel):
+    pair_id: str = Field(description="Pair id")
+    price: float = Field(description="Price of asset in human readable format")
+
+
 class PriceResponse(BaseModel):
     """
     Price is the model for price of asset

@@ -17,6 +17,7 @@ python-jose = "^3.3.0"
 tonsdk = "^1.0.13"
 redis = "^5.0.1"
 ticton = "^0.1.2"
+ccxt = "^4.2.34"
 
 
 [tool.poetry.group.dev.dependencies]

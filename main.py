@@ -69,6 +69,7 @@ def init():
         )
         manager.db["users"].create_index("telegram_id", unique=True)
         manager.db["pairs"].create_index("oracle_address", unique=True)
+        manager.db["providers"].create_index("name", unique=True)
 
     typer.echo("Initializing database")
     asyncio.run(setup())
