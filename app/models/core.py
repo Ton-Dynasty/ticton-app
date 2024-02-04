@@ -38,7 +38,7 @@ class Position(BaseModel):
         description="Amount of quote asset, in human readable format"
     )
     provider_id: str = Field(description="Stratagy provider")
-    status: Literal["active", "danger", "closed"] = Field(
+    status: Literal["active", "danger", "closed", "wait_tick", "wait_ring"] = Field(
         "active", description="Status of position(True if active, False if inactive)"
     )
     reward: Optional[float] = Field(
@@ -54,7 +54,6 @@ class Position(BaseModel):
 class CreatePositionRequest(BaseModel):
     """CreatePositionRequest is for Tick"""
 
-    telegram_id: int = Field(description="telegram user id")
     pair_id: str = Field(description="Pair id")
     base_asset_amount: float = Field(
         description="Amount of base asset, in human readable format"

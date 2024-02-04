@@ -34,9 +34,17 @@ async def create_position(
     manager: DatabaseManager = Depends(get_db),
     tg_user: TelegramUser = Depends(verify_tg_token),
 ):
-    # TODO: Tick here
+
     try:
-        pos = Position(**req.model_dump(), telegram_id=tg_user.id)
+        # TODO: Tick here
+        pair = manager.db["pairs"].find_one({"id": req.pair_id})
+        oracle_address = pair.get("oracle_address")
+        client = await TicTonAsyncClient.init(oracle_addr=oracle_address)
+        price = req.quote_asset_amount / req.base_asset_amount
+        await client.tick(price)
+        pos = Position(**req.model_dump(), telegram_id=tg_user.id, status="wait_tick")
+
+        print(tg_user.id)
         result = manager.db["positions"].insert_one(pos.model_dump())
         print(result)
         return JSONResponse(
@@ -74,14 +82,18 @@ async def close_position(
                 content={"message": "Position already closed"},
             )
 
+        print("1")
         # TODO: Ring the position
         pair = manager.db["pairs"].find_one({"id": pos.pair_id})
         oracle_address = pair.get("oracle_address")
         client = await TicTonAsyncClient.init(oracle_addr=oracle_address)
-        await client.ring(alarm_id=pos.alarm_id)
-
+        print("2")
+        ring_result = await client.ring(alarm_id=22)
+        print(ring_result)
+        print("3")
         result = manager.db["positions"].update_one(
-            {"id": position_id, "telegram_id": tg_user.id}, {"$set": {"status": False}}
+            {"id": position_id, "telegram_id": tg_user.id},
+            {"$set": {"status": "wait_ring"}},
         )
         print(result)
         # if result nModified == 0, means no document is updated
