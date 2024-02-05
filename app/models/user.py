@@ -6,6 +6,7 @@ from app.models.funds import Asset
 class User(BaseModel):
     telegram_id: int = Field(description="telegram user id")
     telegram_name: str = Field(description="telegram user name")
+    avatar: Optional[str] = Field(None, description="user avatar")
     wallet: str = Field(description="wallet address in uesr friendly format")
     balances: Optional[List[Asset]] = Field(None, description="user balances in different assets")
 

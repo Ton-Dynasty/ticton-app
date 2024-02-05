@@ -11,3 +11,13 @@ services:
       - ${TICTON_DB_PORT}:27017
     volumes:
       - ./.volumes/db:/data/db
+  redis:
+    image: redis
+    environment:
+      - REDIS_USERNAME=${REDIS_USERNAME}
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+    command: redis-server --requirepass ${REDIS_PASSWORD} --port ${REDIS_PORT}
+    ports:
+      - "${REDIS_PORT}:${REDIS_PORT}"
+    volumes:
+      - ./.volumes/cache:/data
