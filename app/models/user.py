@@ -1,6 +1,5 @@
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
-from app.models.funds import Asset
 
 
 class User(BaseModel):
@@ -8,7 +7,7 @@ class User(BaseModel):
     telegram_name: str = Field(description="telegram user name")
     avatar: Optional[str] = Field(None, description="user avatar")
     wallet: str = Field(description="wallet address in uesr friendly format")
-    balances: Optional[List[Asset]] = Field(None, description="user balances in different assets")
+    total_rewards: float = Field(0.0, description="total rewards of user")
 
     class Config:
         populate_by_name = True

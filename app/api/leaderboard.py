@@ -1,4 +1,3 @@
-from os import execv
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder

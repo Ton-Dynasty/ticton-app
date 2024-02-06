@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from fastapi.responses import JSONResponse
 from app.dao import DatabaseManager, get_db
-from app.models.core import Position, CreatePositionRequest
+from app.jobs.core import wait_for_ring_success, wait_for_tick_success
+from app.models.core import Alarm, CreatePositionRequest
 from fastapi.encoders import jsonable_encoder
 from typing import List
 from app.models.telegram import TelegramUser
@@ -11,16 +12,13 @@ from ticton import TicTonAsyncClient
 CoreRouter = APIRouter(prefix="/core", tags=["core"])
 
 
-@CoreRouter.get("", response_model=List[Position])
-async def get_postions_by_id(
-    telegram_id: int, manager: DatabaseManager = Depends(get_db)
-):
+@CoreRouter.get("/alarms", response_model=List[Alarm])
+async def get_my_active_alarms(telegram_id: int, manager: DatabaseManager = Depends(get_db)):
     try:
-        result = manager.db["positions"].find({"telegram_id": telegram_id})
-        result = [Position(**i) for i in result]
-        return JSONResponse(
-            status_code=status.HTTP_200_OK, content=jsonable_encoder(result)
-        )
+        # find alarms with telegram_id, and status is not closed
+        result = manager.db["alarms"].find({"telegram_id": telegram_id, "status": {"$ne": "closed"}})
+        result = [Alarm(**i) for i in result]
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -28,9 +26,38 @@ async def get_postions_by_id(
         )
 
 
-@CoreRouter.post("")
-async def create_position(
+@CoreRouter.get("/alarms/closed")
+async def get_my_closed_alarms(telegram_id: int, manager: DatabaseManager = Depends(get_db)):
+    try:
+        # find alarms with telegram_id, and status is closed
+        result = manager.db["alarms"].find({"telegram_id": telegram_id, "status": "closed"})
+        result = [Alarm(**i) for i in result]
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
+
+
+@CoreRouter.get("/alarms")
+async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends(get_db)):
+    try:
+        # find alarms with pair_id
+        result = manager.db["alarms"].find({"pair_id": pair_id, "status": {"$ne": "closed"}})
+        result = [Alarm(**i) for i in result]
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
+
+
+@CoreRouter.post("", description="User calls tick method in frontend and send oracle address and alarm_id to backend.")
+async def tick_alarm(
     req: CreatePositionRequest,
+    bg_tasks: BackgroundTasks,
     manager: DatabaseManager = Depends(get_db),
     tg_user: TelegramUser = Depends(verify_tg_token),
 ):
@@ -39,17 +66,10 @@ async def create_position(
         # TODO: Tick here
         pair = manager.db["pairs"].find_one({"id": req.pair_id})
         oracle_address = pair.get("oracle_address")
-        client = await TicTonAsyncClient.init(oracle_addr=oracle_address)
-        price = req.quote_asset_amount / req.base_asset_amount
-        await client.tick(price)
-        pos = Position(**req.model_dump(), telegram_id=tg_user.id, status="wait_tick")
-
-        print(tg_user.id)
-        result = manager.db["positions"].insert_one(pos.model_dump())
-        print(result)
-        return JSONResponse(
-            status_code=status.HTTP_201_CREATED, content={"message": "Success"}
-        )
+        pos = Alarm(**req.model_dump(), telegram_id=tg_user.id, status="wait_tick")
+        result = manager.db["alarms"].insert_one(pos.model_dump())
+        bg_tasks.add_task(wait_for_tick_success, alarm_id=req.alarm_id, db=manager)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})
 
     except Exception as e:
         return JSONResponse(
@@ -58,53 +78,43 @@ async def create_position(
         )
 
 
-@CoreRouter.put("")
-async def close_position(
+@CoreRouter.put("", description="User calls ring method in frontend, and send alarm_id and oracle address to backend")
+async def ring_alarm(
     position_id: str,
+    bg_tasks: BackgroundTasks,
     manager: DatabaseManager = Depends(get_db),
     tg_user: TelegramUser = Depends(verify_tg_token),
 ):
     try:
         # check if position exists
-        result = manager.db["positions"].find_one(
-            {"id": position_id, "telegram_id": tg_user.id}
-        )
+        result = manager.db["alarms"].find_one({"id": position_id, "telegram_id": tg_user.id})
         if result is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content={"message": "Position not found"},
             )
         # check if position is active
-        pos = Position(**result)
+        pos = Alarm(**result)
         if pos.status == False:
             return JSONResponse(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 content={"message": "Position already closed"},
             )
 
-        print("1")
-        # TODO: Ring the position
         pair = manager.db["pairs"].find_one({"id": pos.pair_id})
         oracle_address = pair.get("oracle_address")
         client = await TicTonAsyncClient.init(oracle_addr=oracle_address)
-        print("2")
-        ring_result = await client.ring(alarm_id=22)
-        print(ring_result)
-        print("3")
-        result = manager.db["positions"].update_one(
+        result = manager.db["alarms"].update_one(
             {"id": position_id, "telegram_id": tg_user.id},
             {"$set": {"status": "wait_ring"}},
         )
-        print(result)
-        # if result nModified == 0, means no document is updated
         if result.modified_count == 0:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
                 content={"message": "Position not found"},
             )
-        return JSONResponse(
-            status_code=status.HTTP_200_OK, content={"message": "Success"}
-        )
+        bg_tasks.add_task(wait_for_ring_success, alarm_id=pos.alarm_id, db=manager, cache=client.cache_manager)
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"message": "Success"})
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
