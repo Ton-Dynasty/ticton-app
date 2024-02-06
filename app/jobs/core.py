@@ -25,6 +25,10 @@ async def on_tick_success(
             manager.db["users"].find_one({"wallet": watchmaker}).get("telegram_id")
         )
 
+        oracle_address = (
+            await manager.db["pairs"].find_one({"id": pair_id}).get("oracle_address")
+        )
+
         # Get Pair Id from DB by Oracle Address
         pair_id = (
             manager.db["pairs"]
