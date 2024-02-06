@@ -1,3 +1,3 @@
 from .user import UserRouter
-from .provider import ProviderRouter
+from .asset import AssetRouter
 from .core import CoreRouter

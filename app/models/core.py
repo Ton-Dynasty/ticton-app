@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
-from app.models.funds import Asset
+from datetime import datetime
 import uuid
 
 
@@ -27,38 +27,65 @@ class CreatePairRequest(BaseModel):
         }
 
 
-class Position(BaseModel):
+class Alarm(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex, description="Position id")
     telegram_id: int = Field(description="telegram user id")
     pair_id: str = Field(description="Pair id")
-    base_asset_amount: float = Field(
-        description="Amount of base asset, in human readable format"
-    )
-    quote_asset_amount: float = Field(
-        description="Amount of quote asset, in human readable format"
-    )
-    provider_id: str = Field(description="Stratagy provider")
-    status: Literal["active", "danger", "closed", "wait_tick", "wait_ring"] = Field(
-        "active", description="Status of position(True if active, False if inactive)"
-    )
-    reward: Optional[float] = Field(
-        None,
+    oracle: str = Field(description="Address of ticton oracle")
+    alarm_id: int = Field(description="Alarm id of position.")
+    # Alarm metadata
+    base_asset_amount: float = Field(description="Amount of base asset, in human readable format")
+    quote_asset_amount: float = Field(description="Amount of quote asset, in human readable format")
+    remain_scale: int = Field(description="Remain scale of position")
+    base_asset_scale: int = Field(description="Base asset scale")
+    quote_asset_scale: int = Field(description="Quote asset scale")
+    # Status
+    status: Literal["active", "danger", "closed", "wait_tick", "wait_ring"] = Field("active", description="Status of position(True if active, False if inactive)")
+    reward: float = Field(
+        0.0,
         description="Reward of position, in human readable format. Only available if position is closed",
     )
-    alarm_id: Optional[int] = Field(None, description="Alarm id of position.")
 
     class Config:
         populate_by_name = True
+        json_schema_extra = {
+            "example": {
+                "id": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
+                "telegram_id": 123456789,
+                "pair_id": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
+                "oracle": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
+                "alarm_id": 123456789,
+                "base_asset_amount": 1.0,
+                "quote_asset_amount": 3.3,
+                "remain_scale": 1,
+                "base_asset_scale": 1,
+                "quote_asset_scale": 1,
+                "status": "active",
+                "reward": 0.0,
+            }
+        }
 
 
 class CreatePositionRequest(BaseModel):
     """CreatePositionRequest is for Tick"""
 
     pair_id: str = Field(description="Pair id")
-    base_asset_amount: float = Field(
-        description="Amount of base asset, in human readable format"
-    )
-    quote_asset_amount: float = Field(
-        description="Amount of quote asset, in human readable format"
-    )
-    provider_id: str = Field(description="Stratagy provider")
+    alarm_id: int = Field(description="Alarm id of position.")
+    oracle: str = Field(description="Address of ticton oracle")
+
+
+class Asset(BaseModel):
+    address: str = Field(description="asset address, e.g. EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA")
+    symbol: str = Field(description="asset symbol, e.g. USDT")
+    decimals: int = Field(description="asset decimals, e.g. 6")
+    balance: int = Field(description="asset balance in minimal units, e.g. 1,000,000 for 1 USDT")
+    image: Optional[str] = Field(description="asset icon")
+
+
+class PriceFeed(BaseModel):
+    source: str = Field(description="price source, e.g. gateio, ticton, active")
+    last_updated_at: datetime = Field(description="price timestamp")
+    price: float = Field(description="price of asset in human readable format")
+
+    class Config:
+        json_encoders = {datetime: lambda v: v.isoformat()}
