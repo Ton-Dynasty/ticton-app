@@ -33,6 +33,7 @@ class Alarm(BaseModel):
     pair_id: str = Field(description="Pair id")
     oracle: str = Field(description="Address of ticton oracle")
     alarm_id: int = Field(description="Alarm id of position.")
+    created_at: datetime = Field(description="Synced at")
     # Alarm metadata
     base_asset_amount: float = Field(description="Amount of base asset, in human readable format")
     quote_asset_amount: float = Field(description="Amount of quote asset, in human readable format")
@@ -48,6 +49,7 @@ class Alarm(BaseModel):
 
     class Config:
         populate_by_name = True
+        json_encoders = {datetime: lambda v: v.isoformat()}
         json_schema_extra = {
             "example": {
                 "id": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
@@ -55,6 +57,8 @@ class Alarm(BaseModel):
                 "pair_id": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
                 "oracle": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
                 "alarm_id": 123456789,
+                "created_at": "2021-08-01T00:00:00Z",
+                "synced_at": "2021-08-01T00:00:00Z",
                 "base_asset_amount": 1.0,
                 "quote_asset_amount": 3.3,
                 "remain_scale": 1,

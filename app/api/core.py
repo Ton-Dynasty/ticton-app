@@ -16,7 +16,7 @@ CoreRouter = APIRouter(prefix="/core", tags=["core"])
 async def get_my_active_alarms(telegram_id: int, manager: DatabaseManager = Depends(get_db)):
     try:
         # find alarms with telegram_id, and status is not closed
-        result = manager.db["alarms"].find({"telegram_id": telegram_id, "status": {"$ne": "closed"}})
+        result = manager.db["alarms"].find({"telegram_id": telegram_id, "status": {"$ne": "closed"}}).sort("created_at", -1)
         result = [Alarm(**i) for i in result]
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
     except Exception as e:
@@ -30,7 +30,7 @@ async def get_my_active_alarms(telegram_id: int, manager: DatabaseManager = Depe
 async def get_my_closed_alarms(telegram_id: int, manager: DatabaseManager = Depends(get_db)):
     try:
         # find alarms with telegram_id, and status is closed
-        result = manager.db["alarms"].find({"telegram_id": telegram_id, "status": "closed"})
+        result = manager.db["alarms"].find({"telegram_id": telegram_id, "status": "closed"}).sort("created_at", -1)
         result = [Alarm(**i) for i in result]
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
     except Exception as e:
@@ -44,7 +44,7 @@ async def get_my_closed_alarms(telegram_id: int, manager: DatabaseManager = Depe
 async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends(get_db)):
     try:
         # find alarms with pair_id
-        result = manager.db["alarms"].find({"pair_id": pair_id, "status": {"$ne": "closed"}})
+        result = manager.db["alarms"].find({"pair_id": pair_id, "status": {"$ne": "closed"}}).sort("created_at", -1)
         result = [Alarm(**i) for i in result]
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
     except Exception as e:
