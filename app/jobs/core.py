@@ -175,7 +175,6 @@ async def on_wind_success(
         new_alarm_info = Alarm(
             telegram_id=telegram_id,
             id=new_alarm_id,
-            telegram_id=telegram_id,
             pair_id=pair_id,
             oracle=oracle_address,
             created_at=datetime.fromtimestamp(created_at),
