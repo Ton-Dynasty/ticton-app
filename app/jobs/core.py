@@ -18,7 +18,7 @@ async def on_tick_success(
     """
     try:
         price = round(float(base_asset_price), 9)
-        watchmaker = Address(watchmaker).to_string(False)
+        watchmaker = Address(watchmaker).to_string(True)
         manager = get_db()
         # Get User's Telegram Id from DB by watchmaker address
         telegram_id = (
@@ -97,15 +97,44 @@ async def on_tick_success(
         )
 
 
-def on_ring_success(alarm_id: int):
+async def on_ring_success(
+    alarm_id: int, create_at: int, origin: str, receiver: str, amount: int
+):
     """
     Wait for ring success.
     UPDATES:
-    - Update the position status to "closed".
-    - Update the position reward.
+    - Update the alarm status to "closed".
+    - Update the alarm reward.
     - Update leader board.
     """
-    pass
+    try:
+        # check the alarm is uninitialized
+        client = await TicTonAsyncClient.init()
+        alarm = await client.check_alarms([alarm_id])
+        alarm_state = alarm[alarm_id]["state"]
+
+        if alarm_state != "uninitialized":
+            raise Exception("Ring failed, alarm state is not uninitialized")
+
+        manager: DatabaseManager = await get_db()
+        # Update the alarm status to "closed" and update the reward.
+        reward = amount / 10**6  # Convert to human readable format
+        await manager.db["alarms"].update_one(
+            {"id": alarm_id}, {"$set": {"status": "closed", "reward": reward}}
+        )
+        # Update leader board
+        wallet_address = Address(receiver).to_string(True)
+        # get the user_id by wallet address
+        user = await manager.db["users"].find_one(
+            {"wallet_address": wallet_address}, {"telegram_id": 1}
+        )
+        await manager.db["leaderboard"].update_one(
+            {"user_id": user["telegram_id"]},
+            {"$inc": {"rewards": reward}},
+            upsert=True,
+        )
+    except Exception as e:
+        raise Exception(str(e))
 
 
 async def on_wind_success(
@@ -124,7 +153,7 @@ async def on_wind_success(
     """
     try:
         manager = get_db()
-        timekeeper = Address(timekeeper).to_string(False)
+        timekeeper = Address(timekeeper).to_string(True)
         price = round(new_base_asset_price, 9)
         telegram_id = await manager.db["users"].find_one({"wallet": timekeeper})[
             "telegram_id"
