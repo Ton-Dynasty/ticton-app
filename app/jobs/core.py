@@ -123,7 +123,7 @@ async def on_wind_success(
     - Update the remain scale of the alarm.
     """
     try:
-        manager = get_db()
+        manager = await get_db()
         timekeeper = Address(timekeeper).to_string(False)
         price = round(new_base_asset_price, 9)
         telegram_id = await manager.db["users"].find_one({"wallet": timekeeper})[
@@ -165,6 +165,7 @@ async def on_wind_success(
         # insert new alarm to database
         new_alarm_info = Alarm(
             id=new_alarm_id,
+            telegram_id=telegram_id,
             pair_id=pair_id,
             oracle=oracle_address,
             created_at=new_alarm["created_at"],
