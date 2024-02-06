@@ -57,12 +57,16 @@ async def create_pair(request: CreatePairRequest, db: DatabaseManager = Depends(
         )
 
 
-@AssetRouter.get("", response_model=List[PriceFeed], description="Get price feeds of a specific pair")
-async def get_price_feeds(pair_id: str, cache: CacheManager = Depends(get_cache)):
+@AssetRouter.get("/price", response_model=List[PriceFeed], description="Get price feeds of a specific pair")
+async def get_price_feeds(pair_id: str, cache: CacheManager = Depends(get_cache), db: DatabaseManager = Depends(get_db)):
     try:
-        # Find price feeds with key pattern "price_feed:*:{pair_id}"
-        iter = cache.client.scan_iter(f"price_feed:*:{pair_id}")
-        result = [json.loads(cache.client.get(i)) for i in iter]  # type: ignore
+        # find pair by pair id
+        pair = db.db["pairs"].find_one({"id": pair_id})
+        pair = Pair(**pair)
+        symbol = f"{pair.base_asset_symbol.upper()}/{pair.quote_asset_symbol.upper()}"
+        iter = cache.client.scan_iter(f"price:*:{symbol}")
+        result = [PriceFeed(**json.loads(cache.client.get(i))) for i in iter]  # type: ignore
+        print(result)
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
     except Exception as e:
         return JSONResponse(

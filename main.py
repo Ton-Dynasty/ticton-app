@@ -49,6 +49,8 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         await manager.disconnect()
+        await cache.disconnect()
+        scheduler.shutdown()
 
 
 cli = Typer()

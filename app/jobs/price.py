@@ -50,6 +50,6 @@ async def set_price(exchanges: List[Exchange], cache: CacheManager, db: Database
     results: List[Tuple[Optional[str], str, float]] = await asyncio.gather(*jobs)
     for source, symbol, price in results:
         feed = PriceFeed(source=source or "", price=price, last_updated_at=datetime.now())
-        resp = cache.client.setex(name=f"price:{source}:{symbol}", time=timedelta(seconds=2), value=feed.model_dump_json())
+        resp = cache.client.set(name=f"price:{source}:{symbol}", value=feed.model_dump_json())
         if not resp:
             logger.error(f"Failed to set price for {source}:{symbol}")
