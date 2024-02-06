@@ -1,9 +1,6 @@
 from app.dao import get_cache, get_db
 from app.dao.manager import CacheManager, DatabaseManager
 from app.models.core import Alarm
-from fastapi import status
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
 from ticton import TicTonAsyncClient
 from tonsdk.utils import Address
 
@@ -107,8 +104,10 @@ async def on_ring_success(
         manager: DatabaseManager = await get_db()
         # Update the alarm status to "closed" and update the reward.
         reward = amount / 10**6  # Convert to human readable format
+        close_at = create_at
         await manager.db["alarms"].update_one(
-            {"id": alarm_id}, {"$set": {"status": "closed", "reward": reward}}
+            {"id": alarm_id},
+            {"$set": {"status": "closed", "reward": reward, "closed_at": close_at}},
         )
         # Update leader board
         wallet_address = Address(receiver).to_string(True)
