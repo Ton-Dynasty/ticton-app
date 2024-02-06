@@ -53,5 +53,3 @@ async def set_price(exchanges: List[Exchange], cache: CacheManager, db: Database
         resp = cache.client.setex(name=f"price:{source}:{symbol}", time=timedelta(seconds=2), value=feed.model_dump_json())
         if not resp:
             logger.error(f"Failed to set price for {source}:{symbol}")
-        else:
-            logger.info(f"Price for {source}:{symbol} set to {price}")
