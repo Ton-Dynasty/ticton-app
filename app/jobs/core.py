@@ -1,7 +1,9 @@
+from app.dao import get_cache, get_db
 from app.dao.manager import CacheManager, DatabaseManager
+from ticton import TicTonAsyncClient
 
 
-def wait_for_tick_success(alarm_id: int, db: DatabaseManager):
+def on_tick_success(alarm_id: int):
     """
     Wait for tick success and check the alarm id is exists.
     If the alarm id is exists, then:
@@ -10,7 +12,7 @@ def wait_for_tick_success(alarm_id: int, db: DatabaseManager):
     pass
 
 
-def wait_for_ring_success(alarm_id: int, db: DatabaseManager, cache: CacheManager):
+def on_ring_success(alarm_id: int):
     """
     Wait for ring success.
     UPDATES:
@@ -21,5 +23,5 @@ def wait_for_ring_success(alarm_id: int, db: DatabaseManager, cache: CacheManage
     pass
 
 
-def wait_for_wind_success():
+def on_wind_success():
     pass
