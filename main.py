@@ -8,9 +8,11 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
 from contextlib import asynccontextmanager
-from app.dao import get_db
+from app.dao import get_cache, get_db
 from app.api import UserRouter, CoreRouter, AssetRouter
 from dotenv import load_dotenv
+from app.jobs import get_scheduler
+from app.jobs.price import get_exchanges, set_price
 
 from app.settings import get_settings
 
@@ -31,6 +33,19 @@ async def lifespan(_: FastAPI):
             db_name=settings.TICTON_DB_NAME,
         )
         manager.db.command("ping")
+        cache = await get_cache()
+        await cache.connect(
+            host=settings.TICTON_REDIS_HOST,
+            port=settings.TICTON_REDIS_PORT,
+            db=settings.TICTON_REDIS_DB,
+            password=settings.TICTON_REDIS_PASSWORD,
+        )
+        resp = cache.client.ping()
+        if not resp:
+            raise Exception("Failed to connect to redis")
+        scheduler = get_scheduler()
+        scheduler.add_job(set_price, "interval", seconds=3, args=[get_exchanges(), cache, manager])
+        scheduler.start()
         yield
     finally:
         await manager.disconnect()
@@ -69,7 +84,7 @@ def init():
         )
         manager.db["users"].create_index("telegram_id", unique=True)
         manager.db["pairs"].create_index("oracle_address", unique=True)
-        manager.db["providers"].create_index("name", unique=True)
+        manager.db[""]
 
     typer.echo("Initializing database")
     asyncio.run(setup())

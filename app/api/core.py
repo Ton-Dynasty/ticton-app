@@ -1,7 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from fastapi.responses import JSONResponse
 from app.dao import DatabaseManager, get_db
-from app.jobs.core import wait_for_ring_success, wait_for_tick_success
 from app.models.core import Alarm, CreatePositionRequest
 from fastapi.encoders import jsonable_encoder
 from typing import List

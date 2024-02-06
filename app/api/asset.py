@@ -1,18 +1,19 @@
 import json
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from app.dao import get_db
 from app.dao import get_cache
 from app.dao.manager import CacheManager, DatabaseManager
+from app.jobs.price import get_exchanges, set_price
 from app.models.core import Asset, PriceFeed, CreatePairRequest
 from app.models.telegram import TelegramUser
 from app.jobs import get_scheduler
 from app.models.core import Pair
 from app.api.middleware.auth import verify_tg_token
 from ticton import TicTonAsyncClient
-
+from apscheduler.schedulers.base import BaseScheduler
 
 AssetRouter = APIRouter(prefix="/asset", tags=["asset"])
 
@@ -63,6 +64,30 @@ async def get_price_feeds(pair_id: str, cache: CacheManager = Depends(get_cache)
         iter = cache.client.scan_iter(f"price_feed:*:{pair_id}")
         result = [json.loads(cache.client.get(i)) for i in iter]  # type: ignore
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
+
+
+@AssetRouter.post("/debug/pairs", description="Add new pair")
+async def debug_create_pair(
+    base_asset_symbol: str, quote_asset_symbol: str, scheduler: BaseScheduler = Depends(get_scheduler), db: DatabaseManager = Depends(get_db), cache: CacheManager = Depends(get_cache)
+):
+    try:
+        pair = Pair(
+            oracle_address="debug",
+            base_asset_address="debug-base-asset-address",
+            quote_asset_address="debug-quote-asset-address",
+            base_asset_symbol=base_asset_symbol,
+            quote_asset_symbol=quote_asset_symbol,
+            base_asset_decimals=9,
+            quote_asset_decimals=6,
+        )
+        result = db.db["pairs"].insert_one(pair.model_dump())
+        print(result)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
