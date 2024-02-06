@@ -27,9 +27,9 @@ def get_exchanges() -> List[Exchange]:
     return [getattr(ccxt, opt)() for opt in options]
 
 
-async def fetch_price(exchange: Exchange, symbol: str) -> Tuple[Optional[str], str, float]:
+async def fetch_price(exchange: Exchange, symbol: str) -> Tuple[Optional[str], str, Optional[float]]:
     ticker = await exchange.fetch_ticker(symbol)
-    return exchange.name, symbol, ticker["last"]
+    return exchange.name, symbol, ticker.get("last", None)
 
 
 async def set_price(exchanges: List[Exchange], cache: CacheManager, db: DatabaseManager):
@@ -49,6 +49,8 @@ async def set_price(exchanges: List[Exchange], cache: CacheManager, db: Database
             jobs.append(fetch_price(exchange, symbol))
     results: List[Tuple[Optional[str], str, float]] = await asyncio.gather(*jobs)
     for source, symbol, price in results:
+        if price is None:
+            continue
         feed = PriceFeed(source=source or "", price=price, last_updated_at=datetime.now())
         resp = cache.client.set(name=f"price:{source}:{symbol}", value=feed.model_dump_json())
         if not resp:
