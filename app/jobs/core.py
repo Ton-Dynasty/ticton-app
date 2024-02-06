@@ -3,6 +3,7 @@ from app.dao.manager import CacheManager, DatabaseManager
 from app.models.core import Alarm
 from ticton import TicTonAsyncClient
 from tonsdk.utils import Address
+from datetime import datetime
 
 
 async def on_tick_success(
@@ -22,10 +23,11 @@ async def on_tick_success(
             manager.db["users"].find_one({"wallet": watchmaker}).get("telegram_id")
         )
 
-        # DEBUG
-        oracle_address = (
-            await manager.db["pairs"].find_one({"id": pair_id}).get("oracle_address")
-        )
+        pair_id = await manager.db["alarms"].find_one({"id": new_alarm_id})["pair_id"]
+
+        oracle_address = await manager.db["pairs"].find_one({"id": pair_id})[
+            "oracle_address"
+        ]
 
         # Get Pair Id from DB by Oracle Address
         pair_id = (
@@ -66,7 +68,8 @@ async def on_tick_success(
             pair_id=pair_id,
             oracle=oracle_address,
             id=new_alarm_id,
-            created_at=created_at,
+            created_at=datetime.fromtimestamp(created_at),
+            closed_at=None,
             base_asset_amount=base_asset_amount,
             quote_asset_amount=quote_asset_amount,
             remain_scale=1,
@@ -104,7 +107,7 @@ async def on_ring_success(
         manager: DatabaseManager = await get_db()
         # Update the alarm status to "closed" and update the reward.
         reward = amount / 10**6  # Convert to human readable format
-        close_at = create_at
+        close_at = datetime.fromtimestamp(create_at)
         await manager.db["alarms"].update_one(
             {"id": alarm_id},
             {"$set": {"status": "closed", "reward": reward, "closed_at": close_at}},
@@ -130,6 +133,7 @@ async def on_wind_success(
     new_base_asset_price: float,
     remain_scale: int,
     new_alarm_id: int,
+    created_at: int,
 ):
     """
     Wait for wind success.
@@ -169,10 +173,12 @@ async def on_wind_success(
 
         # insert new alarm to database
         new_alarm_info = Alarm(
+            telegram_id=telegram_id,
             id=new_alarm_id,
             pair_id=pair_id,
             oracle=oracle_address,
-            created_at=new_alarm["created_at"],
+            created_at=datetime.fromtimestamp(created_at),
+            closed_at=None,
             base_asset_amount=new_alarm["base_asset_amount"],
             quote_asset_amount=new_alarm["quote_asset_amount"],
             remain_scale=new_alarm["remain_scale"],
