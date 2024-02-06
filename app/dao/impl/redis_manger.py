@@ -17,11 +17,10 @@ class RedisManager(CacheManager):
         self,
         host: str,
         port: int,
-        username: str,
         password: str,
         db: int,
     ):
-        self.client = redis.StrictRedis(host=host, port=port, db=db, username=username, password=password)
+        self.client = redis.StrictRedis(host=host, port=port, db=db, password=password)
 
     async def disconnect(self):
         self.client.close()
