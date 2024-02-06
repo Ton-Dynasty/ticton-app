@@ -1,9 +1,6 @@
 from app.dao import get_cache, get_db
 from app.dao.manager import CacheManager, DatabaseManager
 from app.models.core import Alarm
-from fastapi import status
-from fastapi.responses import JSONResponse
-from fastapi.encoders import jsonable_encoder
 from ticton import TicTonAsyncClient
 from tonsdk.utils import Address
 
@@ -18,13 +15,14 @@ async def on_tick_success(
     """
     try:
         price = round(float(base_asset_price), 9)
-        watchmaker = Address(watchmaker).to_string(False)
-        manager = get_db()
+        watchmaker = Address(watchmaker).to_string(True)
+        manager = await get_db()
         # Get User's Telegram Id from DB by watchmaker address
         telegram_id = (
             manager.db["users"].find_one({"wallet": watchmaker}).get("telegram_id")
         )
 
+        # DEBUG
         oracle_address = (
             await manager.db["pairs"].find_one({"id": pair_id}).get("oracle_address")
         )
@@ -45,11 +43,7 @@ async def on_tick_success(
 
         # Check if alarm state is active
         if alarm_state != "active":
-            print("Tick failed, alarm state is not active")
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"message": "Tick failed, Alarm state is not active"},
-            )
+            raise Exception("Tick failed, alarm state is not active")
         else:
             print("Tick success, alarm state is active")
 
@@ -62,11 +56,7 @@ async def on_tick_success(
 
         # Check if alarm watchmaker is matched
         if alarm_watchmaker != watchmaker:
-            print("Tick failed, watchmaker is not matched")
-            return JSONResponse(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                content={"message": "Tick failed, Watchmaker is not matched"},
-            )
+            raise Exception("Tick failed, watchmaker is not matched")
         else:
             print("Tick success, watchmaker is matched")
 
@@ -87,25 +77,51 @@ async def on_tick_success(
         )
         result = manager.db["alarms"].insert_one(alarm.model_dump())
         result = [Alarm(**i) for i in result]
-        return JSONResponse(
-            status_code=status.HTTP_200_OK, content=jsonable_encoder(result)
-        )
+
     except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"message": str(e)},
-        )
+        raise Exception(str(e))
 
 
-def on_ring_success(alarm_id: int):
+async def on_ring_success(
+    alarm_id: int, create_at: int, origin: str, receiver: str, amount: int
+):
     """
     Wait for ring success.
     UPDATES:
-    - Update the position status to "closed".
-    - Update the position reward.
+    - Update the alarm status to "closed".
+    - Update the alarm reward.
     - Update leader board.
     """
-    pass
+    try:
+        # check the alarm is uninitialized
+        client = await TicTonAsyncClient.init()
+        alarm = await client.check_alarms([alarm_id])
+        alarm_state = alarm[alarm_id]["state"]
+
+        if alarm_state != "uninitialized":
+            raise Exception("Ring failed, alarm state is not uninitialized")
+
+        manager: DatabaseManager = await get_db()
+        # Update the alarm status to "closed" and update the reward.
+        reward = amount / 10**6  # Convert to human readable format
+        close_at = create_at
+        await manager.db["alarms"].update_one(
+            {"id": alarm_id},
+            {"$set": {"status": "closed", "reward": reward, "closed_at": close_at}},
+        )
+        # Update leader board
+        wallet_address = Address(receiver).to_string(True)
+        # get the user_id by wallet address
+        user = await manager.db["users"].find_one(
+            {"wallet_address": wallet_address}, {"telegram_id": 1}
+        )
+        await manager.db["leaderboard"].update_one(
+            {"user_id": user["telegram_id"]},
+            {"$inc": {"rewards": reward}},
+            upsert=True,
+        )
+    except Exception as e:
+        raise Exception(str(e))
 
 
 async def on_wind_success(
@@ -123,17 +139,14 @@ async def on_wind_success(
     - Update the remain scale of the alarm.
     """
     try:
-        manager = get_db()
-        timekeeper = Address(timekeeper).to_string(False)
+        manager = await get_db()
+        timekeeper = Address(timekeeper).to_string(True)
         price = round(new_base_asset_price, 9)
         telegram_id = await manager.db["users"].find_one({"wallet": timekeeper})[
             "telegram_id"
         ]
         if telegram_id is None:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"message": "Timekeeper is not registered"},
-            )
+            raise Exception("Timekeeper is not exists")
 
         pair_id = await manager.db["alarms"].find_one({"id": alarm_id})["pair_id"]
 
@@ -144,10 +157,7 @@ async def on_wind_success(
         client = await TicTonAsyncClient.init(oracle_addr=oracle_address)
         alarm = await client.check_alarms([new_alarm_id])
         if alarm[new_alarm_id]["state"] != "active":
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"message": "New alarm is not active"},
-            )
+            raise Exception("New alarm state is not active")
 
         new_alarm_address = alarm[new_alarm_id]["address"]
 
@@ -155,12 +165,7 @@ async def on_wind_success(
         new_alarm = await client.get_alarm_info(new_alarm_address)
 
         if new_alarm["watchmaker_address"] != timekeeper:
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={
-                    "message": "Timekeeper is not the watchmaker of the new alarm"
-                },
-            )
+            raise Exception("Timekeeper is not the watchmaker of the new alarm")
 
         # insert new alarm to database
         new_alarm_info = Alarm(
@@ -195,12 +200,6 @@ async def on_wind_success(
             )
 
         insert_result = [Alarm(**i) for i in insert_result]
-        return JSONResponse(
-            status_code=status.HTTP_200_OK, content=jsonable_encoder(insert_result)
-        )
 
     except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"message": str(e)},
-        )
+        raise Exception(str(e))
