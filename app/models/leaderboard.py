@@ -5,7 +5,6 @@ class LeaderBoardRecord(BaseModel):
     rank: int = Field(description="user rank based on rewards")
     user_id: int = Field(description="telegram user id")
     name: str = Field(description="user name")
-    wallet: str = Field(description="wallet address in uesr friendly format")
     rewards: float = Field(description="total rewards in TIC token")
 
     class Config:

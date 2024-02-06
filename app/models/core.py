@@ -32,7 +32,8 @@ class Alarm(BaseModel):
     pair_id: str = Field(description="Pair id")
     oracle: str = Field(description="Address of ticton oracle")
     id: int = Field(description="Alarm id")
-    created_at: datetime = Field(description="Synced at")
+    created_at: datetime = Field(description="Create at")
+    closed_at: Optional[datetime] = Field(None, description="Closed at")
     # Alarm metadata
     base_asset_amount: float = Field(
         description="Amount of base asset, in human readable format"
