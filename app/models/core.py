@@ -44,7 +44,7 @@ class Alarm(BaseModel):
     base_asset_scale: int = Field(description="Base asset scale")
     quote_asset_scale: int = Field(description="Quote asset scale")
     # Status
-    status: Literal["active", "danger", "closed", "wait_tick", "wait_ring"] = Field(
+    status: Literal["active", "danger", "closed", "emptied"] = Field(
         "active", description="Status of position(True if active, False if inactive)"
     )
     reward: float = Field(
