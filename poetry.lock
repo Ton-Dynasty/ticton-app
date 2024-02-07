@@ -2113,13 +2113,13 @@ full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart", "pyyam
 
 [[package]]
 name = "ticton"
-version = "0.1.3"
+version = "0.1.5"
 description = ""
 optional = false
 python-versions = ">=3.10,<3.12"
 files = [
-    {file = "ticton-0.1.3-py3-none-any.whl", hash = "sha256:d5438181d72b26c7e95ef07b04b8ba02808478d7e39cd28b2d02038b521a7bad"},
-    {file = "ticton-0.1.3.tar.gz", hash = "sha256:5fa0dfcc44576fef85c2c455705616647b2675704dfca537c00a8942fba85fd9"},
+    {file = "ticton-0.1.5-py3-none-any.whl", hash = "sha256:73d9ba698662e4b6095a2a5adc0acbb53e43b73ad7160c7ba4a552545e70f294"},
+    {file = "ticton-0.1.5.tar.gz", hash = "sha256:b1aea9a08b957b6987d74e5790fbb3887ccf9fcd3f92bd1b2eb207c7292688ab"},
 ]
 
 [package.dependencies]

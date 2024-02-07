@@ -86,7 +86,7 @@ async def on_tick_success(
 
 
 async def on_ring_success(
-    alarm_id: int, create_at: int, origin: str, receiver: str, amount: int
+    alarm_id: int, created_at: int, origin: str, receiver: str, amount: int
 ):
     """
     Wait for ring success.
@@ -107,7 +107,7 @@ async def on_ring_success(
         manager: DatabaseManager = await get_db()
         # Update the alarm status to "closed" and update the reward.
         reward = amount / 10**6  # Convert to human readable format
-        close_at = datetime.fromtimestamp(create_at)
+        close_at = datetime.fromtimestamp(created_at)
         await manager.db["alarms"].update_one(
             {"id": alarm_id},
             {"$set": {"status": "closed", "reward": reward, "closed_at": close_at}},
