@@ -48,9 +48,9 @@ async def lifespan(_: FastAPI):
         scheduler.start()
         yield
     finally:
+        scheduler.shutdown()
         await manager.disconnect()
         await cache.disconnect()
-        scheduler.shutdown()
 
 
 cli = Typer()
@@ -85,8 +85,8 @@ def init():
             db_name=settings.TICTON_DB_NAME,
         )
         manager.db["users"].create_index("telegram_id", unique=True)
+        manager.db["users"].create_index("wallet", unique=True)
         manager.db["pairs"].create_index("oracle_address", unique=True)
-        manager.db[""]
 
     typer.echo("Initializing database")
     asyncio.run(setup())

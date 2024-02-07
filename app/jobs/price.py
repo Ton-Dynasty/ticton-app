@@ -33,7 +33,6 @@ async def fetch_price(exchange: Exchange, symbol: str) -> Tuple[Optional[str], s
 
 
 async def set_price(exchanges: List[Exchange], cache: CacheManager, db: DatabaseManager):
-    logger.info("Setting price")
     assert len(exchanges) > 0, "exchange list cannot be empty"
     # Find support pairs in database
     result = db.db["pairs"].find()

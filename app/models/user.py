@@ -24,11 +24,7 @@ class User(BaseModel):
 class IUser(BaseModel):
     telegram_id: int = Field(description="telegram user id")
     telegram_name: str = Field(description="telegram user name")
-    wallet: str = Field(None, description="wallet address in uesr friendly format")
-
-
-class UserRegisterRequest(BaseModel):
-    wallet_type: Literal["telegram-wallet", "tonkeeper", "mytonwallet", "tonhub"] = Field(..., description="wallet type")
+    wallet: str = Field(description="wallet address in uesr friendly format")
 
 
 class WithdrawReqeuest(BaseModel):

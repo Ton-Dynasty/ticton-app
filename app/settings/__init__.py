@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     TICTON_TG_BOT_TOKEN: str
     TICTON_MANIFEST_URL: str
     TICTON_MODE: Literal["dev", "main"]
+    TICTON_TONCENTER_API_KEY: str
+    TICTON_NETWORK: Literal["mainnet", "testnet"]
 
 
 @lru_cache()

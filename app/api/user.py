@@ -7,67 +7,58 @@ from fastapi.encoders import jsonable_encoder
 from pytonconnect import TonConnect
 from app.dao import DatabaseManager, get_db
 from app.models.telegram import TelegramUser
-from app.models.user import IUser, UserRegisterRequest, User, WithdrawReqeuest
+from app.models.ton import TonProofReply
+from app.models.user import IUser, User, WithdrawReqeuest
 from app.api.middleware.auth import verify_tg_token
-from app.utils import generate_tonproof_payload, verify_tonproof_payload
+from app.utils import generate_tonproof_payload, verify_ton_proof
 from app.settings import get_settings, Settings
 from tonsdk.contract import Address
+from datetime import datetime
 
 UserRouter = APIRouter(prefix="/user", tags=["user"])
 
 
-@UserRouter.post(
-    "/register",
-    description="Register user with telegram auth headers and return ton proof url",
-)
-async def reigster(
-    req: UserRegisterRequest,
-    bg_tasks: BackgroundTasks,
-    manager: DatabaseManager = Depends(get_db),
+@UserRouter.post("/proof", description="Get ton proof payload")
+async def get_proof(
     tg_user: TelegramUser = Depends(verify_tg_token),
-    settings: Settings = Depends(get_settings),
+    manager: DatabaseManager = Depends(get_db),
 ):
     try:
-        # do not create user if their wallet address is already exists
+        # check if user is in database
         result = manager.db["users"].find_one({"telegram_id": tg_user.id})
         if result and result.get("telegram_id"):
-            return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"message": "User already exists"},
-            )
-
-        # generate proof
-        proof_payload = generate_tonproof_payload(telegram_id=tg_user.id)
-
-        connector = TonConnect(settings.TICTON_MANIFEST_URL)
-
-        def status_changed(wallet_info):
-            if wallet_info is not None:
-                ok, payload = verify_tonproof_payload(proof_payload, wallet_info)
-                if ok and payload is not None:
-                    addr = Address(wallet_info.account.address).to_string(True, True)
-                    u = IUser(
-                        telegram_id=tg_user.id,
-                        telegram_name=tg_user.username,
-                        wallet=addr,
-                    )
-                    result = manager.db["users"].insert_one(u.model_dump())
-                    print(result)
-                    print(f"User {payload.telegram_id} registered with address {addr}")
-
-        def on_error(err):
-            print("connect_error:", err)
-
-        connector.on_status_change(status_changed, on_error)
-        options = {app["app_name"]: app for app in connector.get_wallets()}
-        wallet_type = options[req.wallet_type]
-        generated_url = await connector.connect(
-            wallet_type,
-            {"ton_proof": proof_payload},
-        )
-        return JSONResponse(content={"url": generated_url}, status_code=status.HTTP_200_OK, background=bg_tasks)
+            return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"message": "User already exists"})
+        proof = generate_tonproof_payload(telegram_id=tg_user.id)
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"proof": proof})
     except Exception as e:
-        print(e)
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
+
+
+@UserRouter.post("/register", description="Register user by providing signed ton proof")
+async def register_user(
+    req: TonProofReply,
+    tg_user: TelegramUser = Depends(verify_tg_token),
+    manager: DatabaseManager = Depends(get_db),
+):
+    try:
+        # check if user is in database
+        result = manager.db["users"].find_one({"telegram_id": tg_user.id})
+        if result and result.get("telegram_id"):
+            return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"message": "User already exists"})
+        # verify ton proof
+        verified, payload, wallet = verify_ton_proof(req)
+        if not verified or payload is None or wallet is None:
+            return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"message": "Failed to verify ton proof"})
+        # check if id matches
+        if payload.telegram_id != tg_user.id:
+            return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"message": "Telegram id mismatch"})
+        # create user
+        user = IUser(telegram_id=tg_user.id, telegram_name=tg_user.username, wallet=wallet.to_string(True))
+        result = manager.db["users"].insert_one(user.model_dump())
+        if not result:
+            return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": "Failed to register user"})
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"message": "User registered successfully"})
+    except Exception as e:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
 
 
@@ -76,8 +67,14 @@ async def reigster(
     response_model=User,
     description="Get user by telegram id, balance field contains jettons, TON and reward token",
 )
-async def get_user_by_id(manager: DatabaseManager = Depends(get_db)):
-    raise NotImplementedError
+async def get_user_by_id(telegram_id: int, manager: DatabaseManager = Depends(get_db)):
+    user = manager.db["users"].find_one({"telegram_id": telegram_id})
+    if not user:
+        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"message": "User not found"})
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content=jsonable_encoder(User(**user)),
+    )
 
 
 @UserRouter.get("", response_model=List[User], description="List all users")
