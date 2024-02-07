@@ -13,11 +13,8 @@ services:
       - ./.volumes/db:/data/db
   redis:
     image: redis
-    environment:
-      - REDIS_USERNAME=${REDIS_USERNAME}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-    command: redis-server --requirepass ${REDIS_PASSWORD} --port ${REDIS_PORT}
+    command: redis-server --requirepass ${TICTON_REDIS_PASSWORD} --port ${TICTON_REDIS_PORT}
     ports:
-      - "${REDIS_PORT}:${REDIS_PORT}"
+      - "${TICTON_REDIS_PORT}:6379"
     volumes:
       - ./.volumes/cache:/data

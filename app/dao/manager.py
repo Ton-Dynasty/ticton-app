@@ -30,7 +30,7 @@ class CacheManager(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def connect(self, host: str, port: int, username: str, password: str, db: int):
+    def connect(self, host: str, port: int, password: str, db: int):
         raise NotImplementedError
 
     @abstractmethod

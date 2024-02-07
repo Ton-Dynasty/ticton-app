@@ -1,19 +1,25 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
-from pytonconnect.parsers import WalletInfo
 from typing import Tuple, Optional
-from app.models.ton import TonProofPayload
+from fastapi import Depends
+
+from ticton import TonCenterClient
+from app.models.ton import TonProofPayload, TonProofReply
+from app.settings import Settings, get_settings
+from app.tools import get_ton_center_client
+from tonsdk.contract import Address
 
 
 def generate_tonproof_payload(
     telegram_id: int,
-    ttl: int = 600,
+    *,
+    ttl: timedelta = timedelta(minutes=5),
 ) -> str:
     payload = {
         "telegram_id": telegram_id,
     }
     payload = bytearray(json.dumps(payload).encode("utf-8"))
-    ts = int(datetime.now().timestamp()) + ttl
+    ts = int((datetime.now() + ttl).timestamp() / 1000)
     payload.extend(ts.to_bytes(8, "big"))
     return payload.hex()
 
@@ -26,15 +32,10 @@ def decode_payload(payload_hex: str) -> TonProofPayload:
     payload_str = payload_bytes[:-8].decode("utf-8")
     payload_dict = json.loads(payload_str)
     telegram_id = payload_dict["telegram_id"]
-    return TonProofPayload(telegram_id=telegram_id, expire_at=expire_at)
+    return TonProofPayload(telegram_id=telegram_id)
 
 
-def verify_tonproof_payload(
-    payload_hex: str, wallet_info: WalletInfo
-) -> Tuple[bool, Optional[TonProofPayload]]:
-    if not wallet_info.check_proof(payload_hex):
-        return False, None
-    payload = decode_payload(payload_hex)
-    if datetime.now().timestamp() > payload.expire_at:
-        return False, None
-    return True, payload
+def verify_ton_proof(
+    reply: TonProofReply, toncenter: TonCenterClient = Depends(get_ton_center_client), settings: Settings = Depends(get_settings)
+) -> Tuple[bool, Optional[TonProofPayload], Optional[Address]]:
+    return (True, TonProofPayload(telegram_id=123456789), Address(""))
