@@ -2,12 +2,14 @@ from datetime import datetime, timedelta
 import json
 from typing import Tuple, Optional
 from fastapi import Depends
-
 from ticton import TonCenterClient
-from app.models.ton import TonProofPayload, TonProofReply
+from app.models.ton import TonAccount, TonProofPayload, TonProofReply
 from app.settings import Settings, get_settings
 from app.tools import get_ton_center_client
 from tonsdk.contract import Address
+import hashlib
+from nacl.signing import VerifyKey
+from nacl.encoding import HexEncoder
 
 
 def generate_tonproof_payload(
@@ -36,6 +38,34 @@ def decode_payload(payload_hex: str) -> TonProofPayload:
 
 
 def verify_ton_proof(
-    reply: TonProofReply, toncenter: TonCenterClient = Depends(get_ton_center_client), settings: Settings = Depends(get_settings)
+    reply: TonProofReply,
+    ton_account: TonAccount,
 ) -> Tuple[bool, Optional[TonProofPayload], Optional[Address]]:
-    return (True, TonProofPayload(telegram_id=123456789), Address(""))
+    wc, whash = ton_account.raw_address.split(":", maxsplit=2)
+
+    message = bytearray()
+    message.extend("ton-proof-item-v2/".encode())
+    message.extend(int(wc, 10).to_bytes(4, "little"))
+    message.extend(bytes.fromhex(whash))
+    message.extend(reply.proof.domain.lengthBytes.to_bytes(4, "little"))
+    message.extend(reply.proof.domain.value.encode())
+    message.extend(reply.proof.timestamp.to_bytes(8, "little"))
+    message.extend(bytes.fromhex(reply.proof.payload_hex))
+
+    signature_message = bytearray()
+    signature_message.extend(bytes.fromhex("ffff"))
+    signature_message.extend("ton-connect".encode())
+    signature_message.extend(hashlib.sha256(message).digest())
+
+    try:
+        # verify ton_account.public_key
+        verify_key = VerifyKey(bytes.fromhex(ton_account.public_key), HexEncoder)
+        verify_key.verify(hashlib.sha256(signature_message).digest(), bytes.fromhex(reply.proof.signature))
+        # decode payload
+        decoded: TonProofPayload = decode_payload(reply.proof.payload_hex)
+        return True, decoded, Address(ton_account.raw_address)
+
+    except Exception as e:
+        print(e)
+
+    return False, None, None
