@@ -4,7 +4,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from app.dao import get_db
 from app.dao.manager import DatabaseManager
-from app.models import LeaderBoardRecord
+from app.models.leaderboard import LeaderBoardRecord
 from app.models.telegram import TelegramUser
 from app.api.middleware.auth import verify_tg_token
 
