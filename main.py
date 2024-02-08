@@ -22,6 +22,8 @@ load_dotenv()
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Put scheduler here to prevent local variable referenced before assignment error
+    scheduler = get_scheduler()
     try:
         settings = get_settings()
         manager = await get_db()
@@ -32,7 +34,9 @@ async def lifespan(_: FastAPI):
             password=settings.TICTON_DB_PASSWORD,
             db_name=settings.TICTON_DB_NAME,
         )
-        manager.db.command("ping")
+        result = manager.db.command("ping")
+        if result["ok"] != 1:
+            raise Exception("Failed to connect to database")
         cache = await get_cache()
         await cache.connect(
             host=settings.TICTON_REDIS_HOST,
@@ -43,7 +47,6 @@ async def lifespan(_: FastAPI):
         resp = cache.client.ping()
         if not resp:
             raise Exception("Failed to connect to redis")
-        scheduler = get_scheduler()
         scheduler.add_job(set_price, "interval", seconds=3, args=[get_exchanges(), cache, manager])
         scheduler.start()
         yield
@@ -84,9 +87,10 @@ def init():
             password=settings.TICTON_DB_PASSWORD,
             db_name=settings.TICTON_DB_NAME,
         )
+        # create indexes
         manager.db["users"].create_index("telegram_id", unique=True)
         manager.db["users"].create_index("wallet", unique=True)
-        manager.db["pairs"].create_index("oracle_address", unique=True)
+        manager.db["pairs"].create_index({"base_asset_symbol": 1, "quote_asset_symbol": 1}, unique=True)
 
     typer.echo("Initializing database")
     asyncio.run(setup())

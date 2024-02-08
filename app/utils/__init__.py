@@ -1,15 +1,22 @@
 from datetime import datetime, timedelta
 import json
 from typing import Tuple, Optional
-from fastapi import Depends
 from ticton import TonCenterClient
+from app.models.common import Pagination
 from app.models.ton import TonAccount, TonProofPayload, TonProofReply
-from app.settings import Settings, get_settings
-from app.tools import get_ton_center_client
 from tonsdk.contract import Address
 import hashlib
 from nacl.signing import VerifyKey
 from nacl.encoding import HexEncoder
+from typing import Optional
+
+
+def get_pagination(page: Optional[int] = 1, per_page: Optional[int] = None):
+    if page is None:
+        page = 1
+    if per_page is None:
+        per_page = 10
+    return Pagination(limit=per_page, skip=(page - 1) * per_page)
 
 
 def generate_tonproof_payload(

@@ -74,15 +74,6 @@ class Alarm(BaseModel):
             }
         }
 
-
-class CreatePositionRequest(BaseModel):
-    """CreatePositionRequest is for Tick"""
-
-    pair_id: str = Field(description="Pair id")
-    alarm_id: int = Field(description="Alarm id of position.")
-    oracle: str = Field(description="Address of ticton oracle")
-
-
 class Asset(BaseModel):
     address: str = Field(
         description="asset address, e.g. EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA"
