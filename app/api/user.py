@@ -7,7 +7,7 @@ from fastapi.encoders import jsonable_encoder
 from pytonconnect import TonConnect
 from app.dao import DatabaseManager, get_db
 from app.models.telegram import TelegramUser
-from app.models.ton import TonProofReply
+from app.models.ton import TonAccount, TonProofReply
 from app.models.user import IUser, User, WithdrawReqeuest
 from app.api.middleware.auth import verify_tg_token
 from app.utils import generate_tonproof_payload, verify_ton_proof
@@ -36,7 +36,8 @@ async def get_proof(
 
 @UserRouter.post("/register", description="Register user by providing signed ton proof")
 async def register_user(
-    req: TonProofReply,
+    reply: TonProofReply,
+    ton_account: TonAccount,
     tg_user: TelegramUser = Depends(verify_tg_token),
     manager: DatabaseManager = Depends(get_db),
 ):
@@ -46,7 +47,7 @@ async def register_user(
         if result and result.get("telegram_id"):
             return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"message": "User already exists"})
         # verify ton proof
-        verified, payload, wallet = verify_ton_proof(req)
+        verified, payload, wallet = verify_ton_proof(reply, ton_account=ton_account)
         if not verified or payload is None or wallet is None:
             return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"message": "Failed to verify ton proof"})
         # check if id matches

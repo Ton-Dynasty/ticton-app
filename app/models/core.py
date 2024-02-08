@@ -22,7 +22,7 @@ class CreatePairRequest(BaseModel):
         populate_by_name = True
         json_schema_extra = {
             "example": {
-                "oracle_address": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
+                "oracle_address": "kQCpk40ub48fvx89vSUjOTRy0vOEEZ4crOPPfLEvg88q1EeH",
             }
         }
 
@@ -35,19 +35,13 @@ class Alarm(BaseModel):
     created_at: datetime = Field(description="Create at")
     closed_at: Optional[datetime] = Field(None, description="Closed at")
     # Alarm metadata
-    base_asset_amount: float = Field(
-        description="Amount of base asset, in human readable format"
-    )
-    quote_asset_amount: float = Field(
-        description="Amount of quote asset, in human readable format"
-    )
+    base_asset_amount: float = Field(description="Amount of base asset, in human readable format")
+    quote_asset_amount: float = Field(description="Amount of quote asset, in human readable format")
     remain_scale: int = Field(description="Remain scale of position")
     base_asset_scale: int = Field(description="Base asset scale")
     quote_asset_scale: int = Field(description="Quote asset scale")
     # Status
-    status: Literal["active", "danger", "closed", "emptied"] = Field(
-        "active", description="Status of position(True if active, False if inactive)"
-    )
+    status: Literal["active", "danger", "closed", "emptied"] = Field("active", description="Status of position(True if active, False if inactive)")
     reward: float = Field(
         0.0,
         description="Reward of position, in human readable format. Only available if position is closed",
@@ -59,8 +53,8 @@ class Alarm(BaseModel):
         json_schema_extra = {
             "example": {
                 "telegram_id": 123456789,
-                "pair_id": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
-                "oracle": "kQDIuXyeKZ9-Bxezc2UaI6Ct8megUpIYwAjCIWOKPhkMMrip",
+                "pair_id": "123e4567-e89b-12d3-a456-426614174000",
+                "oracle": "kQCpk40ub48fvx89vSUjOTRy0vOEEZ4crOPPfLEvg88q1EeH",
                 "id": 123456789,
                 "created_at": "2021-08-01T00:00:00Z",
                 "synced_at": "2021-08-01T00:00:00Z",
@@ -74,15 +68,12 @@ class Alarm(BaseModel):
             }
         }
 
+
 class Asset(BaseModel):
-    address: str = Field(
-        description="asset address, e.g. EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA"
-    )
+    address: str = Field(description="asset address, e.g. EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA")
     symbol: str = Field(description="asset symbol, e.g. USDT")
     decimals: int = Field(description="asset decimals, e.g. 6")
-    balance: int = Field(
-        description="asset balance in minimal units, e.g. 1,000,000 for 1 USDT"
-    )
+    balance: int = Field(description="asset balance in minimal units, e.g. 1,000,000 for 1 USDT")
     image: Optional[str] = Field(description="asset icon")
 
 

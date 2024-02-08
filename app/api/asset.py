@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -6,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.dao import get_db
 from app.dao import get_cache
 from app.dao.manager import CacheManager, DatabaseManager
+from app.jobs.core import subscribe_oracle
 from app.jobs.price import get_exchanges, set_price
 from app.models.core import Asset, PriceFeed, CreatePairRequest
 from app.models.telegram import TelegramUser
@@ -35,8 +37,7 @@ async def get_pairs(db: DatabaseManager = Depends(get_db)):
 async def create_pair(request: CreatePairRequest, db: DatabaseManager = Depends(get_db)):
     # TODO: only ton dynasty can create pair
     try:
-        # TODO: call tic ton sdk to create pair
-        client = await TicTonAsyncClient.init(oracle_addr=request.oracle_address)
+        client: TicTonAsyncClient = await TicTonAsyncClient.init(oracle_addr=request.oracle_address)
 
         pair = Pair(
             oracle_address=request.oracle_address,
@@ -48,7 +49,8 @@ async def create_pair(request: CreatePairRequest, db: DatabaseManager = Depends(
             quote_asset_decimals=client.metadata["quote_asset_decimals"],
         )
         result = db.db["pairs"].insert_one(pair.model_dump())
-        print(result)
+        task = asyncio.create_task(subscribe_oracle(client), name=f"subscribe_oracle_{request.oracle_address}")
+        print("Background Task Created", task)
         return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})
     except Exception as e:
         return JSONResponse(
