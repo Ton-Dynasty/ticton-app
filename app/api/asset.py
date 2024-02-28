@@ -4,9 +4,9 @@ from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from app.dao import get_db
-from app.dao import get_cache
-from app.dao.manager import CacheManager, DatabaseManager
+from app.providers import get_db
+from app.providers import get_cache
+from app.providers.manager import CacheManager, DatabaseManager
 from app.jobs.core import subscribe_oracle
 from app.jobs.price import get_exchanges, set_price
 from app.models.core import Asset, PriceFeed, CreatePairRequest
@@ -41,12 +41,12 @@ async def create_pair(request: CreatePairRequest, db: DatabaseManager = Depends(
 
         pair = Pair(
             oracle_address=request.oracle_address,
-            base_asset_address=client.metadata["base_asset_address"].to_string(),
-            quote_asset_address=client.metadata["quote_asset_address"].to_string(),
-            base_asset_symbol=client.metadata["base_asset_symbol"],
-            quote_asset_symbol=client.metadata["quote_asset_symbol"],
-            base_asset_decimals=client.metadata["base_asset_decimals"],
-            quote_asset_decimals=client.metadata["quote_asset_decimals"],
+            base_asset_address=client.metadata.base_asset_address,
+            quote_asset_address=client.metadata.quote_asset_address,
+            base_asset_symbol="TON",
+            quote_asset_symbol="USDT",
+            base_asset_decimals=client.metadata.base_asset_decimals,
+            quote_asset_decimals=client.metadata.quote_asset_decimals,
         )
         result = db.db["pairs"].insert_one(pair.model_dump())
         task = asyncio.create_task(subscribe_oracle(client), name=f"subscribe_oracle_{request.oracle_address}")
@@ -77,9 +77,28 @@ async def get_price_feeds(pair_id: str, cache: CacheManager = Depends(get_cache)
         )
 
 
+@AssetRouter.delete("/debug/pairs", description="Delete pair")
+async def debug_delete_pair(
+    db: DatabaseManager = Depends(get_db),
+):
+    try:
+        result = db.db["pairs"].delete_many({})
+        print(result)
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"message": "Success"})
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
+
+
 @AssetRouter.post("/debug/pairs", description="Add new pair")
 async def debug_create_pair(
-    base_asset_symbol: str, quote_asset_symbol: str, scheduler: BaseScheduler = Depends(get_scheduler), db: DatabaseManager = Depends(get_db), cache: CacheManager = Depends(get_cache)
+    base_asset_symbol: str,
+    quote_asset_symbol: str,
+    base_asset_image_url: str,
+    quote_asset_image_url: str,
+    db: DatabaseManager = Depends(get_db),
 ):
     try:
         pair = Pair(
@@ -90,6 +109,8 @@ async def debug_create_pair(
             quote_asset_symbol=quote_asset_symbol,
             base_asset_decimals=9,
             quote_asset_decimals=6,
+            base_asset_image_url=base_asset_image_url,
+            quote_asset_image_url=quote_asset_image_url,
         )
         result = db.db["pairs"].insert_one(pair.model_dump())
         print(result)

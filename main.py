@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import uvicorn
 from contextlib import asynccontextmanager
-from app.dao import get_cache, get_db
+from app.providers import get_cache, get_db
 from app.api import UserRouter, CoreRouter, AssetRouter
 from dotenv import load_dotenv
 from app.jobs import get_scheduler

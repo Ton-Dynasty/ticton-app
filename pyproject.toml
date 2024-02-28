@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "ticon-app-webhook"
+name = "app"
 version = "0.1.0"
 description = ""
 authors = ["alan890104 <alan890104@gmail.com>"]

@@ -1,6 +1,6 @@
 from pydoc import cli
-from app.dao import get_cache, get_db
-from app.dao.manager import CacheManager, DatabaseManager
+from app.providers import get_cache, get_db
+from app.providers.manager import CacheManager, DatabaseManager
 from app.models.core import Alarm
 from ticton import TicTonAsyncClient
 from tonsdk.utils import Address
@@ -42,10 +42,10 @@ async def on_tick_success(watchmaker: str, base_asset_price: float, new_alarm_id
 
         # Get Alarm metadata
         alarm_address = alarm[new_alarm_id]["alarm_address"]
-        alarm_metadata = await client.get_alarm_info(alarm_address)
+        alarm_metadata = await client.get_alarm_metadata(alarm_address)
         base_asset_amount = 1  # alarm_metadata.base_asset_amount
         quote_asset_amount = price  # alarm_metadata.quote_asset_amount
-        alarm_watchmaker = alarm_metadata["watchmaker"]
+        alarm_watchmaker = alarm_metadata.watchmaker_address
 
         # Check if alarm watchmaker is matched
         if alarm_watchmaker != watchmaker:
@@ -149,9 +149,10 @@ async def on_wind_success(
         new_alarm_address = alarm[new_alarm_id]["address"]
 
         # get new alarm metadata
-        new_alarm = await client.get_alarm_info(new_alarm_address)
 
-        if new_alarm["watchmaker_address"] != timekeeper:
+        new_alarm = await client.get_alarm_metadata(new_alarm_address)
+
+        if new_alarm.watchmaker_address != timekeeper:
             raise Exception("Timekeeper is not the watchmaker of the new alarm")
 
         # insert new alarm to database
@@ -162,11 +163,11 @@ async def on_wind_success(
             oracle=oracle_address,
             created_at=datetime.fromtimestamp(created_at),
             closed_at=None,
-            base_asset_amount=new_alarm["base_asset_amount"],
-            quote_asset_amount=new_alarm["quote_asset_amount"],
-            remain_scale=new_alarm["remain_scale"],
-            base_asset_scale=new_alarm["base_asset_scale"],
-            quote_asset_scale=new_alarm["quote_asset_scale"],
+            base_asset_amount=new_alarm.base_asset_amount,
+            quote_asset_amount=new_alarm.quote_asset_amount,
+            remain_scale=new_alarm.remain_scale,
+            base_asset_scale=new_alarm.base_asset_scale,
+            quote_asset_scale=new_alarm.quote_asset_scale,
             status=alarm[new_alarm_id]["state"],
             reward=0.0,
         )

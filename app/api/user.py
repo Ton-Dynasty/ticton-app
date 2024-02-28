@@ -5,7 +5,7 @@ from fastapi import status, BackgroundTasks
 from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.encoders import jsonable_encoder
 from pytonconnect import TonConnect
-from app.dao import DatabaseManager, get_db
+from app.providers import DatabaseManager, get_db
 from app.models.telegram import TelegramUser
 from app.models.ton import TonAccount, TonProofReply
 from app.models.user import IUser, User, WithdrawReqeuest

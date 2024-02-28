@@ -1,5 +1,5 @@
 import redis
-from app.dao.manager import CacheManager
+from app.providers.manager import CacheManager
 
 
 class RedisManager(CacheManager):

@@ -13,6 +13,8 @@ class Pair(BaseModel):
     quote_asset_symbol: str = Field(description="Symbol of quote asset")
     base_asset_decimals: int = Field(description="Decimals of base asset")
     quote_asset_decimals: int = Field(description="Decimals of quote asset")
+    base_asset_image_url: Optional[str] = Field(default=None, description="Image url of base asset")
+    quote_asset_image_url: Optional[str] = Field(default=None, description="Image url of quote asset")
 
 
 class CreatePairRequest(BaseModel):
@@ -78,9 +80,11 @@ class Asset(BaseModel):
 
 
 class PriceFeed(BaseModel):
-    source: str = Field(description="price source, e.g. gateio, ticton, active")
+    image_url: Optional[str] = Field(default=None, description="icon of exchange / price feed")
+    source: str = Field(description="price source, e.g. gateio, ticton, active", examples=["gateio", "ticton", "binance"])
     last_updated_at: datetime = Field(description="price timestamp")
-    price: float = Field(description="price of asset in human readable format")
+    price: float = Field(description="price of asset in human readable format", examples=[2.2])
+    symbol: str = Field(description="symbol of the pair", examples=["TON/USDT"])
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}

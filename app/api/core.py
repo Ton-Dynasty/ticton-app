@@ -1,6 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from fastapi.responses import JSONResponse
-from app.dao import DatabaseManager, get_db
+from app.providers import DatabaseManager, get_db
 from app.models.common import PageResponse, Pagination
 from app.models.core import Alarm
 from fastapi.encoders import jsonable_encoder

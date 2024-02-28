@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import json
 from typing import Tuple, Optional
-from ticton import TonCenterClient
 from app.models.common import Pagination
 from app.models.ton import TonAccount, TonProofPayload, TonProofReply
 from tonsdk.contract import Address

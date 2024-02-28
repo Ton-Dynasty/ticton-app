@@ -5,8 +5,8 @@ from operator import is_
 from typing import List, Optional, Tuple
 
 from fastapi import Depends
-from app.dao import get_cache, get_db
-from app.dao.manager import CacheManager, DatabaseManager
+from app.providers import get_cache, get_db
+from app.providers.manager import CacheManager, DatabaseManager
 from app.models.core import PriceFeed, Pair
 from ccxt import Exchange
 import ccxt.async_support as ccxt
@@ -27,7 +27,7 @@ def get_exchanges() -> List[Exchange]:
     return [getattr(ccxt, opt)() for opt in options]
 
 
-async def fetch_price(exchange: Exchange, symbol: str) -> Tuple[Optional[str], str, Optional[float]]:
+async def fetch_price(exchange: Exchange, symbol: str, **kwargs) -> Tuple[Optional[str], str, Optional[float]]:
     ticker = await exchange.fetch_ticker(symbol)
     return exchange.name, symbol, ticker.get("last", None)
 
@@ -50,7 +50,7 @@ async def set_price(exchanges: List[Exchange], cache: CacheManager, db: Database
     for source, symbol, price in results:
         if price is None:
             continue
-        feed = PriceFeed(source=source or "", price=price, last_updated_at=datetime.now())
+        feed = PriceFeed(source=source or "", price=price, last_updated_at=datetime.now(), image_url=None, symbol=symbol)
         resp = cache.client.set(name=f"price:{source}:{symbol}", value=feed.model_dump_json())
         if not resp:
             logger.error(f"Failed to set price for {source}:{symbol}")
