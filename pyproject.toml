@@ -12,7 +12,6 @@ uvicorn = {extras = ["standard"], version = "^0.27.0"}
 typer = {extras = ["all"], version = "^0.9.0"}
 pymongo = "^4.6.1"
 python-dotenv = "^1.0.1"
-pytonconnect = "^0.3.0"
 python-jose = "^3.3.0"
 tonsdk = "^1.0.13"
 redis = "^5.0.1"

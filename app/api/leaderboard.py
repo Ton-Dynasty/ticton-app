@@ -5,8 +5,7 @@ from fastapi.responses import JSONResponse
 from app.providers import get_db
 from app.providers.manager import DatabaseManager
 from app.models.leaderboard import LeaderBoardRecord
-from app.models.telegram import TelegramUser
-from app.api.middleware.auth import verify_tg_token
+from pytoncenter.address import Address
 
 LeaderBoardRouter = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
@@ -24,11 +23,15 @@ async def get_leader_board(rank: int = 10, manager: DatabaseManager = Depends(ge
 
 @LeaderBoardRouter.get("/my", response_model=LeaderBoardRecord, description="Get current user rank based on rewards.")
 async def get_my_leader_board(
+    address: str,
     manager: DatabaseManager = Depends(get_db),
-    tg_user: TelegramUser = Depends(verify_tg_token),
 ):
     try:
+        raw_address = Address(address).to_string(False)
         # get current user rank
-        raise NotImplementedError
+        result = manager.db["leaderboard"].find_one({"address": raw_address})
+        if not result:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(LeaderBoardRecord(**result)))
     except Exception as e:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})

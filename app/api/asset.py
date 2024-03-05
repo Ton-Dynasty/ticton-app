@@ -10,10 +10,8 @@ from app.providers.manager import CacheManager, DatabaseManager
 from app.jobs.core import subscribe_oracle
 from app.jobs.price import get_exchanges, set_price
 from app.models.core import Asset, PriceFeed, CreatePairRequest
-from app.models.telegram import TelegramUser
 from app.jobs import get_scheduler
 from app.models.core import Pair
-from app.api.middleware.auth import verify_tg_token
 from ticton import TicTonAsyncClient
 from apscheduler.schedulers.base import BaseScheduler
 

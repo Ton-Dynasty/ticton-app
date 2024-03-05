@@ -111,23 +111,6 @@ yarl = ">=1.0,<2.0"
 speedups = ["Brotli", "aiodns", "brotlicffi"]
 
 [[package]]
-name = "aiohttp-sse-client"
-version = "0.2.1"
-description = "A Server-Sent Event python client base on aiohttp"
-optional = false
-python-versions = "*"
-files = [
-    {file = "aiohttp-sse-client-0.2.1.tar.gz", hash = "sha256:5004e29271624af586158dc7166cb0687a7a5997aab5b808f4b53400e1b72e3b"},
-    {file = "aiohttp_sse_client-0.2.1-py2.py3-none-any.whl", hash = "sha256:42c81ee9213e9fc8bc412b063bac3a813e02e75250c4c8049222234d41c9b024"},
-]
-
-[package.dependencies]
-aiohttp = ">=3"
-attrs = "*"
-multidict = "*"
-yarl = "*"
-
-[[package]]
 name = "aiolimiter"
 version = "1.1.0"
 description = "asyncio rate limiter, a leaky bucket implementation"
@@ -1950,22 +1933,6 @@ tonpy = ">=0.0.0.1.2b0,<0.0.1.0.0"
 treelib = ">=1.7.0,<2.0.0"
 
 [[package]]
-name = "pytonconnect"
-version = "0.3.0"
-description = "Python SDK for TON Connect 2.0"
-optional = false
-python-versions = ">=3.7"
-files = [
-    {file = "pytonconnect-0.3.0-py3-none-any.whl", hash = "sha256:61f02427c32d30db5bd5217cd2ade754f53b05264515147a6dc7eb59be35ec20"},
-    {file = "pytonconnect-0.3.0.tar.gz", hash = "sha256:fc9fea417fb5a0f78f475e8acfd107043f4580bf90c2d46d4936ea32a09a017b"},
-]
-
-[package.dependencies]
-aiohttp-sse-client = ">=0.2.1"
-pynacl = ">=1.5.0"
-requests = ">=2.28.2"
-
-[[package]]
 name = "pytz"
 version = "2024.1"
 description = "World timezone definitions, modern and historical"
@@ -2887,4 +2854,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "decd03282fa79b43ef6ed16b9ebfb16cb1f96963ab6f6b5f9c4584cb001781c0"
+content-hash = "41ca14b8418f388afcd1e8c56f330e86e15601e437f4b90512847a4d70bc0484"

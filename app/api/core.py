@@ -17,9 +17,9 @@ async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(
     try:
         # find alarms with telegram_id, and status is not closed
         raw_address = Address(address).to_string(False)
-        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": raw_address}, "status": {"$eq": "active"}}).limit(p.limit).skip(p.skip).sort("created_at", -1)
+        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": raw_address}, "status": {"$ne": "closed"}}).limit(p.limit).skip(p.skip).sort("created_at", -1)
         alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"watchmaker": {"$eq": raw_address}, "status": {"$eq": "active"}})
+        total = manager.db["alarms"].count_documents({"watchmaker": {"$eq": raw_address}, "status": {"$ne": "closed"}})
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(PageResponse[Alarm](items=alarms, total=total)))
     except Exception as e:
         return JSONResponse(
