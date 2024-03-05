@@ -28,8 +28,12 @@ def get_exchanges() -> List[Exchange]:
 
 
 async def fetch_price(exchange: Exchange, symbol: str, **kwargs) -> Tuple[Optional[str], str, Optional[float]]:
-    ticker = await exchange.fetch_ticker(symbol)
-    return exchange.name, symbol, ticker.get("last", None)
+    try:
+        ticker = await exchange.fetch_ticker(symbol)
+        return exchange.name, symbol, ticker.get("last", None)
+    except Exception as e:
+        logger.exception(f"Failed to fetch price for {exchange.name}:{symbol}. Reason: {e}")
+        return None, symbol, None
 
 
 async def set_price(exchanges: List[Exchange], cache: CacheManager, db: DatabaseManager):
