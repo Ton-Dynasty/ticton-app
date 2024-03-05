@@ -4,17 +4,18 @@ services:
   mongo:
     image: mongo:6.0
     restart: always
+    command: mongod --port ${TICTON_DB_PORT} --auth
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${TICTON_DB_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${TICTON_DB_PASSWORD}
-    ports:
-      - ${TICTON_DB_PORT}:27017
+    expose:
+      - ${TICTON_DB_PORT}
     volumes:
       - ./.volumes/db:/data/db
   redis:
     image: redis
     command: redis-server --requirepass ${TICTON_REDIS_PASSWORD} --port ${TICTON_REDIS_PORT}
-    ports:
-      - "${TICTON_REDIS_PORT}:6379"
+    expose:
+      - ${TICTON_REDIS_PORT}
     volumes:
       - ./.volumes/cache:/data

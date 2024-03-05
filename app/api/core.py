@@ -5,22 +5,21 @@ from app.models.common import PageResponse, Pagination
 from app.models.core import Alarm
 from fastapi.encoders import jsonable_encoder
 from typing import List
-from app.models.telegram import TelegramUser
-from app.api.middleware.auth import verify_tg_token
 from ticton import TicTonAsyncClient
-
+from pytoncenter.address import Address
 from app.utils import get_pagination
 
 CoreRouter = APIRouter(prefix="/core", tags=["core"])
 
 
-@CoreRouter.get("/alarms/my", response_model=PageResponse[Alarm])
-async def get_my_active_alarms(tg_user: TelegramUser = Depends(verify_tg_token), manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
+@CoreRouter.get("/alarms/{address}/active", response_model=PageResponse[Alarm])
+async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
     try:
         # find alarms with telegram_id, and status is not closed
-        alarms = manager.db["alarms"].find({"telegram_id": tg_user.id, "status": {"$ne": "closed"}}).limit(p.limit).skip(p.skip).sort("created_at", -1)
+        raw_address = Address(address).to_string(False)
+        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": raw_address}, "status": {"$eq": "active"}}).limit(p.limit).skip(p.skip).sort("created_at", -1)
         alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"telegram_id": tg_user.id, "status": {"$ne": "closed"}})
+        total = manager.db["alarms"].count_documents({"watchmaker": {"$eq": raw_address}, "status": {"$eq": "active"}})
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(PageResponse[Alarm](items=alarms, total=total)))
     except Exception as e:
         return JSONResponse(
@@ -29,13 +28,14 @@ async def get_my_active_alarms(tg_user: TelegramUser = Depends(verify_tg_token),
         )
 
 
-@CoreRouter.get("/alarms/my/closed", response_model=PageResponse[Alarm])
-async def get_my_closed_alarms(tg_user: TelegramUser = Depends(verify_tg_token), manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
+@CoreRouter.get("/alarms/{address}/closed", response_model=PageResponse[Alarm])
+async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
     try:
+        raw_address = Address(address).to_string(False)
         # find alarms with telegram_id, and status is closed
-        alarms = manager.db["alarms"].find({"telegram_id": tg_user.id, "status": "closed"}).limit(p.limit).skip(p.skip).sort("closed_at", -1)
+        alarms = manager.db["alarms"].find({"watchmaker": raw_address, "status": "closed"}).limit(p.limit).skip(p.skip).sort("closed_at", -1)
         alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"telegram_id": tg_user.id, "status": "closed"})
+        total = manager.db["alarms"].count_documents({"watchmaker": raw_address, "status": "closed"})
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(PageResponse[Alarm](items=alarms, total=total)))
     except Exception as e:
         return JSONResponse(
