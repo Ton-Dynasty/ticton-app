@@ -7,12 +7,14 @@ import os
 class MongoManager(DatabaseManager):
     client: MongoClient = None  # type: ignore
     db: Database = None  # type: ignore
+    
+    instance = None
 
     def __new__(cls):
         """
         Singleton pattern
         """
-        if not hasattr(cls, "instance"):
+        if not cls.instance:
             cls.instance = super(MongoManager, cls).__new__(cls)
         return cls.instance
 

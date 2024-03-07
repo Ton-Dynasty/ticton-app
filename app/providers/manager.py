@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-
+from apscheduler.schedulers.base import BaseScheduler
 import redis
 
 
@@ -35,4 +35,11 @@ class CacheManager(metaclass=ABCMeta):
 
     @abstractmethod
     def disconnect(self):
+        raise NotImplementedError
+
+
+class ScheduleManager(metaclass=ABCMeta):
+    @property
+    @abstractmethod
+    def scheduler(self) -> BaseScheduler:
         raise NotImplementedError

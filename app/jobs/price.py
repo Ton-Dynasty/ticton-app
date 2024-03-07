@@ -1,10 +1,13 @@
 import asyncio
 from datetime import datetime, timedelta
+from functools import cache
 import json
 from operator import is_
 from typing import List, Optional, Tuple
 
 from fastapi import Depends
+from redis import Redis
+import redis
 from app.providers import get_cache, get_db
 from app.providers.manager import CacheManager, DatabaseManager
 from app.models.core import PriceFeed, Pair
@@ -29,14 +32,16 @@ def get_exchanges() -> List[Exchange]:
 
 async def fetch_price(exchange: Exchange, symbol: str, **kwargs) -> Tuple[Optional[str], str, Optional[float]]:
     try:
-        ticker = await exchange.fetch_ticker(symbol)
+        ticker = await exchange.fetch_ticker(symbol)  # type: ignore
         return exchange.name, symbol, ticker.get("last", None)
     except Exception as e:
         logger.exception(f"Failed to fetch price for {exchange.name}:{symbol}. Reason: {e}")
         return None, symbol, None
 
 
-async def set_price(exchanges: List[Exchange], cache: CacheManager, db: DatabaseManager):
+async def set_price(exchanges: List[Exchange]):
+    cache = await get_cache()
+    db = await get_db()
     assert len(exchanges) > 0, "exchange list cannot be empty"
     # Find support pairs in database
     result = db.db["pairs"].find()
@@ -54,7 +59,9 @@ async def set_price(exchanges: List[Exchange], cache: CacheManager, db: Database
     for source, symbol, price in results:
         if price is None:
             continue
-        feed = PriceFeed(source=source or "", price=price, last_updated_at=datetime.now(), image_url=None, symbol=symbol)
-        resp = cache.client.set(name=f"price:{source}:{symbol}", value=feed.model_dump_json())
+        feed = PriceFeed(source=source or "", price=price, last_updated_at=datetime.now(), symbol=symbol)
+        resp = cache.client.set(name=f"price${source}${symbol}", value=feed.model_dump_json())
         if not resp:
             logger.error(f"Failed to set price for {source}:{symbol}")
+    for exchange in exchanges:
+        await exchange.close() # type: ignore

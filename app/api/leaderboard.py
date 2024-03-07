@@ -1,37 +1,54 @@
+import json
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
-from app.providers import get_db
-from app.providers.manager import DatabaseManager
-from app.models.leaderboard import LeaderboardRecord
+from pydantic import Json
+from app.providers import get_cache, get_db
+from app.providers.manager import CacheManager, DatabaseManager
+from app.models.leaderboard import LeaderboardRecord, LeaderboardRecordResponseList, LeaderboardResponse, LeaderboardRecordResponse
 from pytoncenter.address import Address
 
 LeaderBoardRouter = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
-@LeaderBoardRouter.get("", response_model=List[LeaderboardRecord], description="Get users rank based on rewards, default rank is 10.")
-async def get_leader_board(rank: int = 10, manager: DatabaseManager = Depends(get_db)):
-    try:
-        assert rank > 0, "Rank should be greater than 0."
-        result = manager.db["leaderboard"].sort("rewards", -1).limit(rank)
-        leaderboards = [LeaderboardRecord(**record, rank=i + 1) for i, record in enumerate(result)]
-        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(leaderboards))
-    except Exception as e:
-        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
-
-
-@LeaderBoardRouter.get("/my", response_model=LeaderboardRecord, description="Get current user rank based on rewards.")
+@LeaderBoardRouter.get("", response_model=LeaderboardResponse, description="Get current user rank based on rewards.")
 async def get_my_leader_board(
     address: str,
     manager: DatabaseManager = Depends(get_db),
+    cache: CacheManager = Depends(get_cache),
 ):
     try:
-        raw_address = Address(address).to_string(False)
-        # get current user rank
-        result = manager.db["leaderboard"].find_one({"address": raw_address})
-        if not result:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(LeaderboardRecord(**result)))
+        my_address = Address(address).to_string(False)
+
+        # Calculate rank dynamically based on rewards, assuming 'reward' field is indexed for sorting
+        cache_top_10 = cache.client.get("leaderboard_top_10")
+        if cache_top_10 is not None:
+            top_10_records = json.loads(cache_top_10)  # type: ignore
+            top_10_records = [LeaderboardRecord(**i) for i in top_10_records]
+        else:
+            top_10_records_raw = manager.db["leaderboard"].find().sort("reward", -1).limit(10)
+            top_10_records = [LeaderboardRecord(**i) for i in top_10_records_raw]
+
+        if len(top_10_records) == 0:
+            return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(LeaderboardResponse(current_address=my_address, current_rank=-1, current_reward=0.0, leaderboard=[])))
+
+        # Get the rank of the current user
+        user_rank = 0
+        user_reward = 0.0
+        current_user_record = manager.db["leaderboard"].find_one({"address": my_address})
+        if current_user_record is not None:
+            current_user_rank = manager.db["leaderboard"].count_documents({"reward": {"$gt": current_user_record["reward"]}}) + 1
+            user_rank = current_user_rank
+            user_reward = current_user_record["reward"]
+
+        leaderboard_response = []
+        for i, record in enumerate(top_10_records):
+            is_current_user = record.address == my_address
+            leaderboard_response.append(LeaderboardRecordResponse(address=record.address, rank=i + 1, reward=round(record.reward, 4), is_current_user=is_current_user))
+
+        result = {"current_address": my_address, "current_reward": round(user_reward, 4), "current_rank": user_rank, "leaderboard": leaderboard_response}
+
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(LeaderboardResponse(**result)))
     except Exception as e:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})

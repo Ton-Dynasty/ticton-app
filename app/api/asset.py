@@ -1,21 +1,26 @@
 import asyncio
+from datetime import datetime, timedelta
 import json
 from typing import List
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from ticton import TicTonAsyncClient
 from app.providers import get_db
 from app.providers import get_cache
+from app.providers import get_scheduler
 from app.providers.manager import CacheManager, DatabaseManager
 from app.jobs.core import subscribe_oracle
 from app.jobs.price import get_exchanges, set_price
 from app.models.core import Asset, PriceFeed, CreatePairRequest
-from app.jobs import get_scheduler
 from app.models.core import Pair
 from ticton import TicTonAsyncClient
 from apscheduler.schedulers.base import BaseScheduler
 from app.settings import Settings, get_settings
 from app.tools import get_ticton_client
+from pytoncenter.address import Address
+from pytoncenter import get_client
+from pytoncenter.v3.models import GetSpecifiedJettonWalletRequest
 
 AssetRouter = APIRouter(prefix="/asset", tags=["asset"])
 
@@ -38,6 +43,7 @@ async def create_pair(
     request: CreatePairRequest,
     db: DatabaseManager = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    scheduler: BaseScheduler = Depends(get_scheduler),
 ):
     # TODO: only ton dynasty can create pair
     try:
@@ -51,10 +57,12 @@ async def create_pair(
         #     ]
         # )
 
+        oracle_address = Address(request.oracle_address).to_string(False)
+
         pair = Pair(
-            oracle_address=request.oracle_address,
-            base_asset_address=client.metadata.base_asset_address,
-            quote_asset_address=client.metadata.quote_asset_address,
+            oracle_address=oracle_address,
+            base_asset_address=Address(client.metadata.base_asset_address).to_string(False),
+            quote_asset_address=Address(client.metadata.quote_asset_address).to_string(False),
             base_asset_symbol="TON",
             quote_asset_symbol="USDT",
             base_asset_decimals=client.metadata.base_asset_decimals,
@@ -65,10 +73,15 @@ async def create_pair(
         result = db.db["pairs"].insert_one(pair.model_dump())
         if result.acknowledged:
             print("Pair Created", pair)
-            return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})
-        # TODO: Maybe change to multiprocessing in the future
-        task = asyncio.create_task(subscribe_oracle(client), name=f"subscribe_oracle_{request.oracle_address}")
-        print("Background Task Created", task)
+        scheduler.add_job(
+            subscribe_oracle,
+            "date",
+            next_run_time=datetime.now() + timedelta(seconds=5),
+            kwargs={"client": client},
+            id=f"subscribe_oracle_{pair.oracle_address}",
+            name=f"subscribe_oracle_{pair.oracle_address}",
+            replace_existing=True,
+        )
         return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})
     except Exception as e:
         return JSONResponse(
@@ -84,10 +97,27 @@ async def get_price_feeds(pair_id: str, cache: CacheManager = Depends(get_cache)
         pair = db.db["pairs"].find_one({"id": pair_id})
         pair = Pair(**pair)
         symbol = f"{pair.base_asset_symbol.upper()}/{pair.quote_asset_symbol.upper()}"
-        iter = cache.client.scan_iter(f"price:*:{symbol}")
+        iter = cache.client.scan_iter(f"price$*${symbol}")
         result = [PriceFeed(**json.loads(cache.client.get(i))) for i in iter]  # type: ignore
-        print(result)
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(result))
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
+
+
+@AssetRouter.get("/reward", description="Get the number of reward tokens in specified address currently")
+async def get_reward_by_address(address: str, settings: Settings = Depends(get_settings)):
+    try:
+        my_address = Address(address).to_string(False)
+        client = get_client(version="v3", network=settings.TICTON_NETWORK)
+        request = GetSpecifiedJettonWalletRequest(owner_address=my_address, jetton_address="0:903d8c69172157c484a203f738db0358af3706736f4d7051eaaeea434e54f76b")
+        result = await client.get_jetton_wallets(request)
+        if result is None:
+            return JSONResponse(status_code=status.HTTP_200_OK, content={"reward": 0})
+        balance = result.balance / 10**9
+        return JSONResponse(status_code=status.HTTP_200_OK, content={"reward": balance})
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -106,7 +136,7 @@ async def debug_delete_pair(
         pair = db.db["pairs"].find_one({"id": pair_id})
         oracle_address = pair["oracle_address"]
 
-        # TODO: remove background task by oracle address
+        scheduler.remove_job(job_id=f"subscribe_oracle_{oracle_address}")
 
         # delete pair by pair id
         result = db.db["pairs"].delete_one({"id": pair_id})

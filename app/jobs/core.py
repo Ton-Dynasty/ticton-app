@@ -1,82 +1,74 @@
 import asyncio
+from hmac import new
+from operator import ne
 from pydoc import cli
-from app.providers import get_cache, get_db
-from app.providers.manager import CacheManager, DatabaseManager
+import time
+
+from pytz import utc
+import pytz
+from app.providers import get_cache, get_db, get_scheduler
+from app.providers.manager import CacheManager, DatabaseManager, ScheduleManager
 from app.models.core import Alarm
 from ticton import TicTonAsyncClient
-from tonsdk.utils import Address
-from datetime import datetime
+from pytoncenter.address import Address
+from datetime import datetime, timedelta
 from ticton.callbacks import OnTickSuccessParams, OnRingSuccessParams, OnWindSuccessParams
 from app.models.core import Pair
 from app.settings import Settings
-from app.tools import get_ticton_client
+from apscheduler.schedulers.base import BaseScheduler
 
 
-async def on_tick_success(client: TicTonAsyncClient, params: OnTickSuccessParams, **kwargs):
+async def on_tick_success(client: TicTonAsyncClient, params: OnTickSuccessParams, pair_info: Pair, **kwargs):
     """
     Wait for tick success and check the alarm id is exists.
     If the alarm id is exists, then:
     - Update the position status to "active".
     """
     try:
-        price = round(float(params.base_asset_price), 9)
-        watchmaker = Address(params.watchmaker).to_string(True)
-        manager = await get_db()
-
-        pair_id = await manager.db["alarms"].find_one({"id": params.new_alarm_id})["pair_id"]
-
-        oracle_address = await manager.db["pairs"].find_one({"id": pair_id})["oracle_address"]
-
-        # Get Pair Id from DB by Oracle Address
-        pair_id = manager.db["pairs"].find_one({"oracle_address": oracle_address}).get("pair_id")
-
-        # Get Alarm's watchmaker
-        alarm = await client.check_alarms([params.new_alarm_id])
-        alarm_state = alarm[params.new_alarm_id]["state"]
-
-        # Check if alarm state is active
-        if alarm_state != "active":
-            raise Exception("Tick failed, alarm state is not active")
-        else:
-            print("Tick success, alarm state is active")
-
-        # Get Alarm metadata
-        alarm_address = alarm[params.new_alarm_id]["alarm_address"]
-        alarm_metadata = await client.get_alarm_metadata(alarm_address)
-        base_asset_amount = 1  # alarm_metadata.base_asset_amount
-        quote_asset_amount = price  # alarm_metadata.quote_asset_amount
-        alarm_watchmaker = alarm_metadata.watchmaker_address
-
-        # Check if alarm watchmaker is matched
-        if alarm_watchmaker != watchmaker:
-            raise Exception("Tick failed, watchmaker is not matched")
-        else:
-            print("Tick success, watchmaker is matched")
+        manager: DatabaseManager = kwargs["manager"]
 
         # Put Alarm data to DB
         alarm = Alarm(
             id=params.new_alarm_id,
-            pair_id=pair_id,
-            oracle=oracle_address,
+            address=Address(params.tx.in_msg.destination).to_string(False),  # type: ignore
+            lt=params.tx.lt,
+            pair_id=pair_info.id,
+            oracle=Address(pair_info.oracle_address).to_string(False),
             created_at=datetime.fromtimestamp(params.created_at),
             closed_at=None,
-            base_asset_amount=base_asset_amount,
-            quote_asset_amount=quote_asset_amount,
+            watchmaker=Address(params.watchmaker).to_string(False),
+            base_asset_amount=client.metadata.min_base_asset_threshold / 10**client.metadata.base_asset_decimals,
+            quote_asset_amount=params.base_asset_price * (client.metadata.min_base_asset_threshold / 10**client.metadata.base_asset_decimals),
             min_base_asset_threshold=client.metadata.min_base_asset_threshold / 10**client.metadata.base_asset_decimals,
+            origin_remain_scale=1,
             remain_scale=1,
             base_asset_scale=1,
             quote_asset_scale=1,
             status="active",
             reward=0.0,
+            price=params.base_asset_price,
         )
-        result = manager.db["alarms"].insert_one(alarm.model_dump())
-        result = [Alarm(**i) for i in result]
-
+        result = manager.db["alarms"].update_one(
+            {"id": params.new_alarm_id},
+            {"$set": alarm.model_dump()},
+            upsert=True,
+        )
+        if result.acknowledged:
+            print(
+                "Tick Success | {ts} | {symbol} | alarm #{alarm_id} | price: {price}".format(
+                    ts=datetime.fromtimestamp(params.tx.now, tz=utc).astimezone(pytz.timezone("Asia/Taipei")).isoformat(),
+                    symbol=f"{pair_info.base_asset_symbol}/{pair_info.quote_asset_symbol}",
+                    alarm_id=params.new_alarm_id,
+                    price=params.base_asset_price,
+                )
+            )
     except Exception as e:
-        raise Exception(str(e))
+        import traceback
+
+        print(traceback.format_exc())
 
 
-async def on_ring_success(client: TicTonAsyncClient, params: OnRingSuccessParams, **kwargs):
+async def on_ring_success(client: TicTonAsyncClient, params: OnRingSuccessParams, pair_info: Pair, **kwargs):
     """
     Wait for ring success.
     UPDATES:
@@ -85,32 +77,42 @@ async def on_ring_success(client: TicTonAsyncClient, params: OnRingSuccessParams
     - Update leader board.
     """
     try:
-        # check the alarm is uninitialized
-        alarm = await client.check_alarms([params.alarm_id])
-        alarm_state = alarm[params.alarm_id]["state"]
-
-        if alarm_state != "uninitialized":
-            raise Exception("Ring failed, alarm state is not uninitialized")
-
-        manager: DatabaseManager = await get_db()
-        # Update the alarm status to "closed" and update the reward.
-        close_at = datetime.fromtimestamp(params.created_at)
-        await manager.db["alarms"].update_one(
-            {"id": params.alarm_id},
-            {"$set": {"status": "closed", "reward": params.reward, "closed_at": close_at}},
-        )
+        manager: DatabaseManager = kwargs["manager"]
+        # check if alarm is exists
+        alarm = manager.db["alarms"].find_one({"id": params.alarm_id})
+        if alarm is None:
+            raise Exception("on_ring_success: Alarm does not exist")
+        else:
+            # Update the alarm status to "closed" and update the reward.
+            close_at = datetime.fromtimestamp(params.created_at)
+            manager.db["alarms"].update_one(
+                {"id": params.alarm_id},
+                {"$set": {"status": "closed", "reward": params.reward, "closed_at": close_at}},
+            )
         # Update leader board
-        wallet_address = Address(params.receiver).to_string(True)
-        await manager.db["leaderboard"].update_one(
-            {"address": wallet_address},
-            {"$inc": {"rewards": params.reward}},
-            upsert=True,
+        if params.receiver is not None and params.reward > 0:
+            wallet_address = Address(params.receiver).to_string(False)
+            manager.db["leaderboard"].update_one(
+                {"address": wallet_address},
+                {"$inc": {"reward": params.reward}},
+                upsert=True,
+            )
+
+        print(
+            "Ring Success | {ts} | {symbol} | alarm #{alarm_id} | reward: {reward}".format(
+                ts=datetime.fromtimestamp(params.tx.now, tz=utc).astimezone(pytz.timezone("Asia/Taipei")).isoformat(),
+                symbol=f"{pair_info.base_asset_symbol}/{pair_info.quote_asset_symbol}",
+                alarm_id=params.alarm_id,
+                reward=params.reward,
+            )
         )
     except Exception as e:
-        raise Exception(str(e))
+        import traceback
+
+        print(traceback.format_exc())
 
 
-async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams, **kwargs):
+async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams, pair_info: Pair, **kwargs):
     """
     Wait for wind success.
     UPDATES:
@@ -119,94 +121,114 @@ async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams
     - Update the remain scale of the alarm.
     """
     try:
-        manager = await get_db()
-        timekeeper = Address(params.timekeeper).to_string(True)
-        price = round(params.new_base_asset_price, 9)
+        manager: DatabaseManager = kwargs["manager"]
 
-        pair_id = await manager.db["alarms"].find_one({"id": params.alarm_id})["pair_id"]
-
-        oracle_address = await manager.db["pairs"].find_one({"id": pair_id})["oracle_address"]
-
-        alarm = await client.check_alarms([params.new_alarm_id])
-        if alarm[params.new_alarm_id]["state"] != "active":
-            raise Exception("New alarm state is not active")
-
-        new_alarm_address = alarm[params.new_alarm_id]["address"]
-
-        # get new alarm metadata
-
-        new_alarm = await client.get_alarm_metadata(new_alarm_address)
-
-        if new_alarm.watchmaker_address != timekeeper:
-            raise Exception("Timekeeper is not the watchmaker of the new alarm")
+        old_alarm_raw = manager.db["alarms"].find_one({"id": params.alarm_id})
+        if old_alarm_raw is None:
+            raise Exception("Old alarm does not exist")
+        old_alarm = Alarm(**old_alarm_raw)
 
         # insert new alarm to database
-        new_alarm_info = Alarm(
+        new_alarm = Alarm(
             id=params.new_alarm_id,
-            pair_id=pair_id,
-            oracle=oracle_address,
-            created_at=datetime.fromtimestamp(params.created_at),
+            address=Address(params.tx.in_msg.source).to_string(False),  # type: ignore
+            lt=params.tx.lt,
+            pair_id=pair_info.id,
+            oracle=Address(pair_info.oracle_address).to_string(False),
+            created_at=datetime.fromtimestamp(params.created_at, tz=utc),
             closed_at=None,
-            base_asset_amount=new_alarm.base_asset_amount,
-            quote_asset_amount=new_alarm.quote_asset_amount,
+            price=params.new_base_asset_price,
+            base_asset_amount=old_alarm.base_asset_amount * 2,
+            quote_asset_amount=old_alarm.quote_asset_amount * 2,
             min_base_asset_threshold=client.metadata.min_base_asset_threshold / 10**client.metadata.base_asset_decimals,
-            remain_scale=new_alarm.remain_scale,
-            base_asset_scale=new_alarm.base_asset_scale,
-            quote_asset_scale=new_alarm.quote_asset_scale,
-            status=alarm[params.new_alarm_id]["state"],
+            origin_remain_scale=2,  # TODO: check this
+            remain_scale=2,  # TODO: check this
+            base_asset_scale=2,  # TODO: check this
+            quote_asset_scale=2,  # TODO: check this
+            status="active",
             reward=0.0,
+            watchmaker=Address(params.timekeeper).to_string(False),
         )
 
-        insert_result = await manager.db["alarms"].insert_one(new_alarm_info.model_dump())
+        # upsert new alarm
+        manager.db["alarms"].update_one(
+            {"id": params.new_alarm_id},
+            {"$set": new_alarm.model_dump()},
+            upsert=True,
+        )
 
         if params.remain_scale == 0:
             # update the old alarm status to "emptied" and remain scale
-            await manager.db["alarms"].update_one(
+            manager.db["alarms"].update_one(
                 {"id": params.alarm_id},
                 {"$set": {"status": "emptied", "remain_scale": params.remain_scale}},
             )
         else:
             # update the old alarm remain scale
-            await manager.db["alarms"].update_one(
+            manager.db["alarms"].update_one(
                 {"id": params.alarm_id},
                 {"$set": {"remain_scale": params.remain_scale}},
             )
 
-        insert_result = [Alarm(**i) for i in insert_result]
+        print(
+            "Wind Success | {ts} | {symbol} | old alarm #{old_alarm_id} | new alarm #{new_alarm_id} | new price {new_price}".format(
+                ts=datetime.fromtimestamp(params.tx.now, tz=utc).astimezone(pytz.timezone("Asia/Taipei")).isoformat(),
+                symbol=f"{pair_info.base_asset_symbol}/{pair_info.quote_asset_symbol}",
+                old_alarm_id=params.alarm_id,
+                new_alarm_id=params.new_alarm_id,
+                new_price=params.new_base_asset_price,
+            )
+        )
 
     except Exception as e:
-        raise Exception(str(e))
+        import traceback
+
+        print(traceback.format_exc())
 
 
-async def subscribe_oracle(client: TicTonAsyncClient):
+async def subscribe_oracle(client: TicTonAsyncClient, **kwargs):
     """
     Subscribe to oracle address.
     """
+    manager = await get_db()
+    pair_info_raw = manager.db["pairs"].find_one({"oracle_address": client.oracle.to_string(False)})
+    if pair_info_raw is None:
+        raise Exception("subscribe_oracle: Pair does not exist")
+    pair_info = Pair(**pair_info_raw)
+    last_record = manager.db["alarms"].find({"oracle": pair_info.oracle_address}).sort({"created_at": -1}).limit(1)
+    start_lt = "oldest"
+    last_record = [Alarm(**i) for i in last_record]
+    if len(last_record) == 1:
+        start_lt = last_record[0].lt
     await client.subscribe(
         on_tick_success=on_tick_success,  # type: ignore
         on_ring_success=on_ring_success,  # type: ignore
         on_wind_success=on_wind_success,  # type: ignore
-        start_lt="oldest",
+        start_lt=start_lt,
+        manager=manager,
+        pair_info=pair_info,
+        **kwargs,
     )
 
 
-async def initialize_jobs(settings: Settings, db: DatabaseManager):
+async def init_subscriptions(db: DatabaseManager, scheduler: ScheduleManager):
     """
     Initialize the background jobs.
     """
     # get pairs from db
-    pairs = await db.db["pairs"].find()
+    pairs = db.db["pairs"].find()
     pairs = [Pair(**i) for i in pairs]
 
     # subscribe to oracle address
     for pair in pairs:
-        client = await TicTonAsyncClient.init(oracle_addr=pair.oracle_address)
-        _ = asyncio.create_task(
-            client.subscribe(
-                on_tick_success=on_tick_success,  # type: ignore
-                on_ring_success=on_ring_success,  # type: ignore
-                on_wind_success=on_wind_success,  # type: ignore
-                start_lt="oldest",
-                db=db,
+        if scheduler.scheduler.get_job(f"subscribe_oracle_{pair.oracle_address}") is None:
+            client = await TicTonAsyncClient.init(oracle_addr=pair.oracle_address)
+            scheduler.scheduler.add_job(
+                subscribe_oracle,
+                "date",
+                next_run_time=datetime.now() + timedelta(seconds=5),
+                kwargs={"client": client},
+                id=f"subscribe_oracle_{pair.oracle_address}",
+                name=f"subscribe_oracle_{pair.oracle_address}",
+                replace_existing=True,
             )
-        )
