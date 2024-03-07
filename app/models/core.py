@@ -35,6 +35,7 @@ class Alarm(BaseModel):
     remain_scale: int = Field(description="Remain scale of position")
     base_asset_scale: int = Field(description="Base asset scale")
     quote_asset_scale: int = Field(description="Quote asset scale")
+    min_base_asset_threshold: float = Field(description="Minimum base asset threshold")
     # Status
     status: Literal["active", "danger", "closed", "emptied"] = Field("active", description="Status of position(True if active, False if inactive)")
     reward: float = Field(0.0, description="Reward of position, in human readable format. Only available if position is closed")

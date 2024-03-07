@@ -1,3 +1,5 @@
+import asyncio
+from pydoc import cli
 from app.providers import get_cache, get_db
 from app.providers.manager import CacheManager, DatabaseManager
 from app.models.core import Alarm
@@ -5,9 +7,12 @@ from ticton import TicTonAsyncClient
 from tonsdk.utils import Address
 from datetime import datetime
 from ticton.callbacks import OnTickSuccessParams, OnRingSuccessParams, OnWindSuccessParams
+from app.models.core import Pair
+from app.settings import Settings
+from app.tools import get_ticton_client
 
 
-async def on_tick_success(params: OnTickSuccessParams):
+async def on_tick_success(client: TicTonAsyncClient, params: OnTickSuccessParams, **kwargs):
     """
     Wait for tick success and check the alarm id is exists.
     If the alarm id is exists, then:
@@ -17,8 +22,6 @@ async def on_tick_success(params: OnTickSuccessParams):
         price = round(float(params.base_asset_price), 9)
         watchmaker = Address(params.watchmaker).to_string(True)
         manager = await get_db()
-        # Get User's Telegram Id from DB by watchmaker address
-        telegram_id = manager.db["users"].find_one({"wallet": watchmaker}).get("telegram_id")
 
         pair_id = await manager.db["alarms"].find_one({"id": params.new_alarm_id})["pair_id"]
 
@@ -26,9 +29,6 @@ async def on_tick_success(params: OnTickSuccessParams):
 
         # Get Pair Id from DB by Oracle Address
         pair_id = manager.db["pairs"].find_one({"oracle_address": oracle_address}).get("pair_id")
-
-        # Init TicTonAsyncClient
-        client: TicTonAsyncClient = await TicTonAsyncClient.init(oracle_addr=oracle_address)
 
         # Get Alarm's watchmaker
         alarm = await client.check_alarms([params.new_alarm_id])
@@ -55,13 +55,14 @@ async def on_tick_success(params: OnTickSuccessParams):
 
         # Put Alarm data to DB
         alarm = Alarm(
+            id=params.new_alarm_id,
             pair_id=pair_id,
             oracle=oracle_address,
-            id=params.new_alarm_id,
             created_at=datetime.fromtimestamp(params.created_at),
             closed_at=None,
             base_asset_amount=base_asset_amount,
             quote_asset_amount=quote_asset_amount,
+            min_base_asset_threshold=client.metadata.min_base_asset_threshold / 10**client.metadata.base_asset_decimals,
             remain_scale=1,
             base_asset_scale=1,
             quote_asset_scale=1,
@@ -75,7 +76,7 @@ async def on_tick_success(params: OnTickSuccessParams):
         raise Exception(str(e))
 
 
-async def on_ring_success(params: OnRingSuccessParams):
+async def on_ring_success(client: TicTonAsyncClient, params: OnRingSuccessParams, **kwargs):
     """
     Wait for ring success.
     UPDATES:
@@ -85,7 +86,6 @@ async def on_ring_success(params: OnRingSuccessParams):
     """
     try:
         # check the alarm is uninitialized
-        client: TicTonAsyncClient = await TicTonAsyncClient.init()
         alarm = await client.check_alarms([params.alarm_id])
         alarm_state = alarm[params.alarm_id]["state"]
 
@@ -101,10 +101,8 @@ async def on_ring_success(params: OnRingSuccessParams):
         )
         # Update leader board
         wallet_address = Address(params.receiver).to_string(True)
-        # get the user_id by wallet address
-        user = await manager.db["users"].find_one({"wallet_address": wallet_address}, {"telegram_id": 1})
         await manager.db["leaderboard"].update_one(
-            {"user_id": user["telegram_id"]},
+            {"address": wallet_address},
             {"$inc": {"rewards": params.reward}},
             upsert=True,
         )
@@ -112,9 +110,7 @@ async def on_ring_success(params: OnRingSuccessParams):
         raise Exception(str(e))
 
 
-async def on_wind_success(
-    params: OnWindSuccessParams,
-):
+async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams, **kwargs):
     """
     Wait for wind success.
     UPDATES:
@@ -126,15 +122,11 @@ async def on_wind_success(
         manager = await get_db()
         timekeeper = Address(params.timekeeper).to_string(True)
         price = round(params.new_base_asset_price, 9)
-        telegram_id = await manager.db["users"].find_one({"wallet": timekeeper})["telegram_id"]
-        if telegram_id is None:
-            raise Exception("Timekeeper is not exists")
 
         pair_id = await manager.db["alarms"].find_one({"id": params.alarm_id})["pair_id"]
 
         oracle_address = await manager.db["pairs"].find_one({"id": pair_id})["oracle_address"]
 
-        client = await TicTonAsyncClient.init(oracle_addr=oracle_address)
         alarm = await client.check_alarms([params.new_alarm_id])
         if alarm[params.new_alarm_id]["state"] != "active":
             raise Exception("New alarm state is not active")
@@ -157,6 +149,7 @@ async def on_wind_success(
             closed_at=None,
             base_asset_amount=new_alarm.base_asset_amount,
             quote_asset_amount=new_alarm.quote_asset_amount,
+            min_base_asset_threshold=client.metadata.min_base_asset_threshold / 10**client.metadata.base_asset_decimals,
             remain_scale=new_alarm.remain_scale,
             base_asset_scale=new_alarm.base_asset_scale,
             quote_asset_scale=new_alarm.quote_asset_scale,
@@ -190,8 +183,30 @@ async def subscribe_oracle(client: TicTonAsyncClient):
     Subscribe to oracle address.
     """
     await client.subscribe(
-        on_tick_success=on_tick_success,
-        on_ring_success=on_ring_success,
-        on_wind_success=on_wind_success,
+        on_tick_success=on_tick_success,  # type: ignore
+        on_ring_success=on_ring_success,  # type: ignore
+        on_wind_success=on_wind_success,  # type: ignore
         start_lt="oldest",
     )
+
+
+async def initialize_jobs(settings: Settings, db: DatabaseManager):
+    """
+    Initialize the background jobs.
+    """
+    # get pairs from db
+    pairs = await db.db["pairs"].find()
+    pairs = [Pair(**i) for i in pairs]
+
+    # subscribe to oracle address
+    for pair in pairs:
+        client = await TicTonAsyncClient.init(oracle_addr=pair.oracle_address)
+        _ = asyncio.create_task(
+            client.subscribe(
+                on_tick_success=on_tick_success,  # type: ignore
+                on_ring_success=on_ring_success,  # type: ignore
+                on_wind_success=on_wind_success,  # type: ignore
+                start_lt="oldest",
+                db=db,
+            )
+        )

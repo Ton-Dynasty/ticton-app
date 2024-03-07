@@ -15,6 +15,7 @@ from app.models.core import Pair
 from ticton import TicTonAsyncClient
 from apscheduler.schedulers.base import BaseScheduler
 from app.settings import Settings, get_settings
+from app.tools import get_ticton_client
 
 AssetRouter = APIRouter(prefix="/asset", tags=["asset"])
 
@@ -40,11 +41,7 @@ async def create_pair(
 ):
     # TODO: only ton dynasty can create pair
     try:
-        client: TicTonAsyncClient = await TicTonAsyncClient.init(
-            mnemonics="unset",
-            oracle_addr=request.oracle_address,
-            testnet=settings.TICTON_NETWORK == "testnet",
-        )
+        client = await get_ticton_client(oracle_address=request.oracle_address, settings=settings)
 
         # TODO
         # jetton_base, jetton_quote = await client.toncenter.multicall(
@@ -100,42 +97,21 @@ async def get_price_feeds(pair_id: str, cache: CacheManager = Depends(get_cache)
 
 @AssetRouter.delete("/debug/pairs", description="Delete pair")
 async def debug_delete_pair(
+    pair_id: str,
     db: DatabaseManager = Depends(get_db),
+    scheduler: BaseScheduler = Depends(get_scheduler),
 ):
     try:
-        result = db.db["pairs"].delete_many({})
+        # get oracle address by pair id
+        pair = db.db["pairs"].find_one({"id": pair_id})
+        oracle_address = pair["oracle_address"]
+
+        # TODO: remove background task by oracle address
+
+        # delete pair by pair id
+        result = db.db["pairs"].delete_one({"id": pair_id})
         print(result)
         return JSONResponse(status_code=status.HTTP_200_OK, content={"message": "Success"})
-    except Exception as e:
-        return JSONResponse(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            content={"message": str(e)},
-        )
-
-
-@AssetRouter.post("/debug/pairs", description="Add new pair")
-async def debug_create_pair(
-    base_asset_symbol: str,
-    quote_asset_symbol: str,
-    base_asset_image_url: str,
-    quote_asset_image_url: str,
-    db: DatabaseManager = Depends(get_db),
-):
-    try:
-        pair = Pair(
-            oracle_address="debug",
-            base_asset_address="debug-base-asset-address",
-            quote_asset_address="debug-quote-asset-address",
-            base_asset_symbol=base_asset_symbol,
-            quote_asset_symbol=quote_asset_symbol,
-            base_asset_decimals=9,
-            quote_asset_decimals=6,
-            base_asset_image_url=base_asset_image_url,
-            quote_asset_image_url=quote_asset_image_url,
-        )
-        result = db.db["pairs"].insert_one(pair.model_dump())
-        print(result)
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})
     except Exception as e:
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
