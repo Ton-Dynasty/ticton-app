@@ -6,14 +6,14 @@ from fastapi.responses import JSONResponse
 from pydantic import Json
 from app.providers import get_cache, get_db
 from app.providers.manager import CacheManager, DatabaseManager
-from app.models.leaderboard import LeaderboardRecord, LeaderboardRecordResponseList, LeaderboardResponse, LeaderboardRecordResponse
+from app.models.leaderboard import LeaderboardRecord, LeaderboardRecordList, LeaderboardResponse, LeaderboardRecordResponse
 from pytoncenter.address import Address
 
 LeaderBoardRouter = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
 
 @LeaderBoardRouter.get("", response_model=LeaderboardResponse, description="Get current user rank based on rewards.")
-async def get_my_leader_board(
+async def get_leader_board(
     address: str,
     manager: DatabaseManager = Depends(get_db),
     cache: CacheManager = Depends(get_cache),
@@ -25,12 +25,13 @@ async def get_my_leader_board(
         cache_top_10 = cache.client.get("leaderboard_top_10")
         if cache_top_10 is not None:
             top_10_records = json.loads(cache_top_10)  # type: ignore
-            top_10_records = [LeaderboardRecord(**i) for i in top_10_records]
+            top_10_records = LeaderboardRecordList(**top_10_records)
         else:
             top_10_records_raw = manager.db["leaderboard"].find().sort("reward", -1).limit(10)
-            top_10_records = [LeaderboardRecord(**i) for i in top_10_records_raw]
+            top_10_records = LeaderboardRecordList(leaderboard=[LeaderboardRecord(**i) for i in top_10_records_raw])
+            cache.client.set("leaderboard_top_10", top_10_records.model_dump_json(), ex=60)
 
-        if len(top_10_records) == 0:
+        if len(top_10_records.leaderboard) == 0:
             return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(LeaderboardResponse(current_address=my_address, current_rank=-1, current_reward=0.0, leaderboard=[])))
 
         # Get the rank of the current user
@@ -43,7 +44,7 @@ async def get_my_leader_board(
             user_reward = current_user_record["reward"]
 
         leaderboard_response = []
-        for i, record in enumerate(top_10_records):
+        for i, record in enumerate(top_10_records.leaderboard):
             is_current_user = record.address == my_address
             leaderboard_response.append(LeaderboardRecordResponse(address=record.address, rank=i + 1, reward=round(record.reward, 4), is_current_user=is_current_user))
 

@@ -13,8 +13,8 @@ class LeaderboardRecordResponse(LeaderboardRecord):
     rank: int = Field(description="Rank of user")
 
 
-class LeaderboardRecordResponseList(BaseModel):
-    leaderboard: List[LeaderboardRecordResponse] = Field(description="Leaderboard records")
+class LeaderboardRecordList(BaseModel):
+    leaderboard: List[LeaderboardRecord] = Field(description="Leaderboard records")
 
 
 class LeaderboardResponse(BaseModel):
