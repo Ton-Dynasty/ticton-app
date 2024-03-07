@@ -29,7 +29,7 @@ async def get_leader_board(
         else:
             top_10_records_raw = manager.db["leaderboard"].find().sort("reward", -1).limit(10)
             top_10_records = LeaderboardRecordList(leaderboard=[LeaderboardRecord(**i) for i in top_10_records_raw])
-            cache.client.set("leaderboard_top_10", top_10_records.model_dump_json(), ex=60)
+            await cache.client.set("leaderboard_top_10", top_10_records.model_dump_json(), ex=60)
 
         if len(top_10_records.leaderboard) == 0:
             return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(LeaderboardResponse(current_address=my_address, current_rank=-1, current_reward=0.0, leaderboard=[])))
