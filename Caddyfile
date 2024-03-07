@@ -1,5 +1,3 @@
 miniapp.ticton.xyz {
-	reverse_proxy app:{$TICTON_SERVER_PORT} {
-		flush_interval -1 # low-latency mode
-	}
+	reverse_proxy localhost:{$TICTON_SERVER_PORT}
 }
