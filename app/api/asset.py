@@ -14,6 +14,7 @@ from app.jobs import get_scheduler
 from app.models.core import Pair
 from ticton import TicTonAsyncClient
 from apscheduler.schedulers.base import BaseScheduler
+from app.settings import Settings, get_settings
 
 AssetRouter = APIRouter(prefix="/asset", tags=["asset"])
 
@@ -32,10 +33,26 @@ async def get_pairs(db: DatabaseManager = Depends(get_db)):
 
 
 @AssetRouter.post("/pairs", description="Add new pair")
-async def create_pair(request: CreatePairRequest, db: DatabaseManager = Depends(get_db)):
+async def create_pair(
+    request: CreatePairRequest,
+    db: DatabaseManager = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+):
     # TODO: only ton dynasty can create pair
     try:
-        client: TicTonAsyncClient = await TicTonAsyncClient.init(oracle_addr=request.oracle_address)
+        client: TicTonAsyncClient = await TicTonAsyncClient.init(
+            mnemonics="unset",
+            oracle_addr=request.oracle_address,
+            testnet=settings.TICTON_NETWORK == "testnet",
+        )
+
+        # TODO
+        # jetton_base, jetton_quote = await client.toncenter.multicall(
+        #     [
+        #         client.toncenter.get_jetton_masters(client.metadata.base_asset_address),
+        #         client.toncenter.get_jetton_masters(client.metadata.quote_asset_address),
+        #     ]
+        # )
 
         pair = Pair(
             oracle_address=request.oracle_address,
@@ -45,8 +62,14 @@ async def create_pair(request: CreatePairRequest, db: DatabaseManager = Depends(
             quote_asset_symbol="USDT",
             base_asset_decimals=client.metadata.base_asset_decimals,
             quote_asset_decimals=client.metadata.quote_asset_decimals,
+            base_asset_image_url=request.base_asset_image_url,
+            quote_asset_image_url=request.quote_asset_image_url,
         )
         result = db.db["pairs"].insert_one(pair.model_dump())
+        if result.acknowledged:
+            print("Pair Created", pair)
+            return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})
+        # TODO: Maybe change to multiprocessing in the future
         task = asyncio.create_task(subscribe_oracle(client), name=f"subscribe_oracle_{request.oracle_address}")
         print("Background Task Created", task)
         return JSONResponse(status_code=status.HTTP_201_CREATED, content={"message": "Success"})

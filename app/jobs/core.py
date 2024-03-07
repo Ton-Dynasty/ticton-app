@@ -55,7 +55,6 @@ async def on_tick_success(params: OnTickSuccessParams):
 
         # Put Alarm data to DB
         alarm = Alarm(
-            telegram_id=telegram_id,
             pair_id=pair_id,
             oracle=oracle_address,
             id=params.new_alarm_id,
@@ -151,7 +150,6 @@ async def on_wind_success(
 
         # insert new alarm to database
         new_alarm_info = Alarm(
-            telegram_id=telegram_id,
             id=params.new_alarm_id,
             pair_id=pair_id,
             oracle=oracle_address,

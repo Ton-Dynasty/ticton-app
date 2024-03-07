@@ -2,13 +2,13 @@ from pydantic import BaseModel, Field
 from typing import List, Literal, Optional
 from datetime import datetime
 import uuid
-
+from pytoncenter.v3.models import AddressLike
 
 class Pair(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex, description="Pair id")
     oracle_address: str = Field(description="Address of ticton oracle")
-    base_asset_address: str = Field(description="Address of base asset")
-    quote_asset_address: str = Field(description="Address of quote asset")
+    base_asset_address: AddressLike = Field(description="Address of base asset")
+    quote_asset_address: AddressLike = Field(description="Address of quote asset")
     base_asset_symbol: str = Field(description="Symbol of base asset")
     quote_asset_symbol: str = Field(description="Symbol of quote asset")
     base_asset_decimals: int = Field(description="Decimals of base asset")
@@ -18,15 +18,9 @@ class Pair(BaseModel):
 
 
 class CreatePairRequest(BaseModel):
-    oracle_address: str = Field(description="Address of ticton oracle")
-
-    class Config:
-        populate_by_name = True
-        json_schema_extra = {
-            "example": {
-                "oracle_address": "kQCpk40ub48fvx89vSUjOTRy0vOEEZ4crOPPfLEvg88q1EeH",
-            }
-        }
+    oracle_address: str = Field(description="Address of ticton oracle", examples=["kQCQPYxpFyFXxISiA_c42wNYrzcGc29NcFHqrupDTlT3a9It"])
+    base_asset_image_url: str = Field(description="Image url of base asset", examples=["https://cryptologos.cc/logos/toncoin-ton-logo.svg?v=029"])
+    quote_asset_image_url: str = Field(description="Image url of quote asset", examples=["https://cryptologos.cc/logos/tether-usdt-logo.svg?v=029"])
 
 
 class Alarm(BaseModel):
@@ -86,7 +80,6 @@ class PriceFeed(BaseModel):
         json_encoders = {datetime: lambda v: v.isoformat()}
 
 
-
 class AlarmResponse(BaseModel):
     base_asset_image_url: str = Field(description="Image url of base asset")
     quote_asset_image_url: str = Field(description="Image url of quote asset")
@@ -101,4 +94,3 @@ class AlarmResponse(BaseModel):
     alarm_id: int = Field(description="Alarm id", examples=[13])
     alarm_address: str = Field(description="Address of alarm")
     remain_scale: int = Field(description="Remain scale of position", examples=[1])
-
