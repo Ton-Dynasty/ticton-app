@@ -1,19 +1,20 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, status
 from fastapi.responses import JSONResponse
-from app.providers import DatabaseManager, get_db
+from app.providers import DatabaseManager, get_cache, get_db
 from app.models.common import PageResponse, Pagination
-from app.models.core import Alarm
+from app.models.core import Alarm, AlarmResponse
 from fastapi.encoders import jsonable_encoder
 from typing import List
 from ticton import TicTonAsyncClient
 from pytoncenter.address import Address
-from app.utils import get_pagination
+from app.providers.manager import CacheManager
+from app.utils import get_pagination, calculate_time_elapse
 
 CoreRouter = APIRouter(prefix="/core", tags=["core"])
 
 
-@CoreRouter.get("/alarms/{address}/active", response_model=PageResponse[Alarm])
-async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
+@CoreRouter.get("/alarms/{address}/active", response_model=PageResponse[AlarmResponse])
+async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(get_db), cache: CacheManager = Depends(get_cache), p: Pagination = Depends(get_pagination)):
     try:
         # find alarms with telegram_id, and status is not closed
         raw_address = Address(address).to_string(False)
@@ -28,7 +29,7 @@ async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(
         )
 
 
-@CoreRouter.get("/alarms/{address}/closed", response_model=PageResponse[Alarm])
+@CoreRouter.get("/alarms/{address}/closed", response_model=PageResponse[AlarmResponse])
 async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
     try:
         raw_address = Address(address).to_string(False)

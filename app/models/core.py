@@ -30,10 +30,9 @@ class CreatePairRequest(BaseModel):
 
 
 class Alarm(BaseModel):
-    telegram_id: int = Field(description="telegram user id")
+    id: int = Field(description="Alarm id")
     pair_id: str = Field(description="Pair id")
     oracle: str = Field(description="Address of ticton oracle")
-    id: int = Field(description="Alarm id")
     created_at: datetime = Field(description="Create at")
     closed_at: Optional[datetime] = Field(None, description="Closed at")
     # Alarm metadata
@@ -44,10 +43,7 @@ class Alarm(BaseModel):
     quote_asset_scale: int = Field(description="Quote asset scale")
     # Status
     status: Literal["active", "danger", "closed", "emptied"] = Field("active", description="Status of position(True if active, False if inactive)")
-    reward: float = Field(
-        0.0,
-        description="Reward of position, in human readable format. Only available if position is closed",
-    )
+    reward: float = Field(0.0, description="Reward of position, in human readable format. Only available if position is closed")
 
     class Config:
         populate_by_name = True
@@ -88,3 +84,21 @@ class PriceFeed(BaseModel):
 
     class Config:
         json_encoders = {datetime: lambda v: v.isoformat()}
+
+
+
+class AlarmResponse(BaseModel):
+    base_asset_image_url: str = Field(description="Image url of base asset")
+    quote_asset_image_url: str = Field(description="Image url of quote asset")
+    created_since: str = Field(description="Created since", examples=["10 mins ago"])
+    price: float = Field(description="Price", examples=[2.735])
+    base_asset_scale: int = Field(description="Base asset scale", examples=[1])
+    quote_asset_scale: int = Field(description="Quote asset scale", examples=[1])
+    reward_amount: float = Field(description="Reward amount", examples=[2.26])
+    base_asset_threshold: float = Field(description="Base asset threshold, for example, if the value is 0.3 means 1 Unit equals to 0.3 base_asset", examples=[0.3])
+    arbitrage_ratio: float = Field(default=0.0, description="remain scale / original scale", examples=[0.5])
+    watchmaker: str = Field(description="Address of watch maker")
+    alarm_id: int = Field(description="Alarm id", examples=[13])
+    alarm_address: str = Field(description="Address of alarm")
+    remain_scale: int = Field(description="Remain scale of position", examples=[1])
+

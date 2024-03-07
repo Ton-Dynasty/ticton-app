@@ -10,6 +10,8 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${TICTON_DB_PASSWORD}
     expose:
       - ${TICTON_DB_PORT}
+    ports:
+      - ${TICTON_DB_PORT}:${TICTON_DB_PORT}
     volumes:
       - ./.volumes/db:/data/db
   redis:
@@ -19,3 +21,5 @@ services:
       - ${TICTON_REDIS_PORT}
     volumes:
       - ./.volumes/cache:/data
+    ports:
+      - ${TICTON_REDIS_PORT}:${TICTON_REDIS_PORT}

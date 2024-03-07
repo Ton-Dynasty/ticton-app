@@ -1,5 +1,4 @@
 import asyncio
-from enum import unique
 import fastapi
 import typer
 from typer import Typer
@@ -15,9 +14,6 @@ from app.jobs import get_scheduler
 from app.jobs.price import get_exchanges, set_price
 
 from app.settings import get_settings
-
-
-load_dotenv()
 
 
 @asynccontextmanager
