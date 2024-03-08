@@ -49,22 +49,14 @@ async def create_pair(
     try:
         client = await get_ticton_client(oracle_address=request.oracle_address, settings=settings)
 
-        # TODO
-        # jetton_base, jetton_quote = await client.toncenter.multicall(
-        #     [
-        #         client.toncenter.get_jetton_masters(client.metadata.base_asset_address),
-        #         client.toncenter.get_jetton_masters(client.metadata.quote_asset_address),
-        #     ]
-        # )
-
         oracle_address = Address(request.oracle_address).to_string(False)
 
         pair = Pair(
             oracle_address=oracle_address,
             base_asset_address=Address(client.metadata.base_asset_address).to_string(False),
             quote_asset_address=Address(client.metadata.quote_asset_address).to_string(False),
-            base_asset_symbol="TON",
-            quote_asset_symbol="USDT",
+            base_asset_symbol=client.metadata.base_asset_symbol,
+            quote_asset_symbol=client.metadata.quote_asset_symbol,
             base_asset_decimals=client.metadata.base_asset_decimals,
             quote_asset_decimals=client.metadata.quote_asset_decimals,
             base_asset_image_url=request.base_asset_image_url,
@@ -140,7 +132,8 @@ async def debug_delete_pair(
 
         # delete pair by pair id
         result = db.db["pairs"].delete_one({"id": pair_id})
-        print(result)
+        if result.acknowledged:
+            print("Pair Deleted", pair_id)
         return JSONResponse(status_code=status.HTTP_200_OK, content={"message": "Success"})
     except Exception as e:
         return JSONResponse(

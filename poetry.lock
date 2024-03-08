@@ -2309,13 +2309,13 @@ full = ["httpx (>=0.22.0)", "itsdangerous", "jinja2", "python-multipart (>=0.0.7
 
 [[package]]
 name = "ticton"
-version = "0.1.29"
+version = "0.1.31"
 description = ""
 optional = false
 python-versions = ">=3.10,<3.12"
 files = [
-    {file = "ticton-0.1.29-py3-none-any.whl", hash = "sha256:5024240f7bf3c0b5634d6cc7b3e54fb4425a54fa91bf449aadde56f950e6f61b"},
-    {file = "ticton-0.1.29.tar.gz", hash = "sha256:5f54872e802091eb8e57c85cb54163016f64d0233343a7d59abb4f11b0512963"},
+    {file = "ticton-0.1.31-py3-none-any.whl", hash = "sha256:ae1579651e5600ec738e888c66330455c7e0ecab038d0938f0859a37ac37c904"},
+    {file = "ticton-0.1.31.tar.gz", hash = "sha256:cb65037cbfead435121e0df44983d335ccabfbde4c07d633b1c80d27bcf71abd"},
 ]
 
 [package.dependencies]
@@ -3021,4 +3021,4 @@ multidict = ">=4.0"
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "10cc4e462164f1254227a3e8861680b7c7de3a7d6a561c38e2af4313384bc5f4"
+content-hash = "f3ab4fd090bafa552c1c618efbfe01ba56656232544b60cd2bf4e469385552fc"

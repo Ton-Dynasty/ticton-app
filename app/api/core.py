@@ -18,7 +18,8 @@ async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(
     try:
         # find alarms with telegram_id, and status is not closed
         my_address = Address(address).to_string(False)
-        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": my_address}, "status": {"$ne": "closed"}}).limit(p.limit).skip(p.skip).sort("created_at", -1)
+        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": my_address}, "status": {"$ne": "closed"}}).sort("created_at", -1).limit(p.limit).skip(p.skip)
+
         alarms = [Alarm(**i) for i in alarms]
         total = manager.db["alarms"].count_documents({"watchmaker": {"$eq": my_address}, "status": {"$ne": "closed"}})
         responses = []
@@ -60,9 +61,9 @@ async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(
     try:
         my_address = Address(address).to_string(False)
         # find alarms with telegram_id, and status is closed
-        alarms = manager.db["alarms"].find({"watchmaker": my_address, "status": "closed"}).limit(p.limit).skip(p.skip).sort("closed_at", -1)
+        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": my_address}, "status": {"$eq": "closed"}}).sort("closed_at", -1).limit(p.limit).skip(p.skip)
         alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"watchmaker": my_address, "status": "closed"})
+        total = manager.db["alarms"].count_documents({"watchmaker": {"$eq": my_address}, "status": {"$eq": "closed"}})
         responses = []
 
         unique_pairs = set([alarm.pair_id for alarm in alarms])
@@ -101,7 +102,7 @@ async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(
 async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
     try:
         # get pair by pair_id
-        pair_raw = manager.db["pairs"].find_one({"id": pair_id})
+        pair_raw = manager.db["pairs"].find_one({"id": {"$eq": pair_id}})
         if pair_raw is None:
             return JSONResponse(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -109,9 +110,9 @@ async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends
             )
         pair = Pair(**pair_raw)
         # find alarms with pair_id
-        alarms = manager.db["alarms"].find({"pair_id": pair_id, "status": {"$ne": "closed"}, "remain_scale": {"$gt": 0}}).limit(p.limit).skip(p.skip).sort("alarm_id", -1)
+        alarms = manager.db["alarms"].find({"pair_id": {"$eq": pair_id}, "status": {"$ne": "closed"}, "remain_scale": {"$gt": 0}}).sort("alarm_id", -1).limit(p.limit).skip(p.skip)
         alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"pair_id": pair_id, "status": {"$ne": "closed"}})
+        total = manager.db["alarms"].count_documents({"pair_id": {"$eq": pair_id}, "status": {"$ne": "closed"}})
         responses = []
         for alarm in alarms:
             responses.append(
