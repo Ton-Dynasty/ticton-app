@@ -97,6 +97,7 @@ class AlarmResponse(BaseModel):
     base_asset_image_url: str = Field(description="Image url of base asset")
     quote_asset_image_url: str = Field(description="Image url of quote asset")
     created_since: str = Field(description="Created since", examples=["10 mins ago"])
+    closed_since: Optional[str] = Field(default=None, description="Closed since", examples=["10 mins ago"])
     price: float = Field(description="Price", examples=[2.735])
     base_asset_scale: int = Field(description="Base asset scale", examples=[1])
     quote_asset_scale: int = Field(description="Quote asset scale", examples=[1])

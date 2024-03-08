@@ -18,10 +18,19 @@ async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(
     try:
         # find alarms with telegram_id, and status is not closed
         my_address = Address(address).to_string(False)
-        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": my_address}, "status": {"$ne": "closed"}}).sort("created_at", -1).limit(p.limit).skip(p.skip)
+        pipeline = [
+            {"$match": {"watchmaker": {"$eq": my_address}, "status": {"$ne": "closed"}}},
+            {"$sort": {"alarm_id": -1}},
+            {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
+        ]
 
-        alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"watchmaker": {"$eq": my_address}, "status": {"$ne": "closed"}})
+        result = manager.db["alarms"].aggregate(pipeline)
+        alarms = []
+        total = 0
+        for batch in result:
+            alarms = [Alarm(**i) for i in batch["paginatedResults"]]
+            total = batch["totalCount"][0]["count"] if batch["totalCount"] else 0
+
         responses = []
 
         unique_pairs = set([alarm.pair_id for alarm in alarms])
@@ -61,9 +70,19 @@ async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(
     try:
         my_address = Address(address).to_string(False)
         # find alarms with telegram_id, and status is closed
-        alarms = manager.db["alarms"].find({"watchmaker": {"$eq": my_address}, "status": {"$eq": "closed"}}).sort("closed_at", -1).limit(p.limit).skip(p.skip)
-        alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"watchmaker": {"$eq": my_address}, "status": {"$eq": "closed"}})
+        pipeline = [
+            {"$match": {"watchmaker": {"$eq": my_address}, "status": {"$eq": "closed"}}},
+            {"$sort": {"alarm_id": -1}},
+            {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
+        ]
+
+        result = manager.db["alarms"].aggregate(pipeline)
+        alarms = []
+        total = 0
+        for batch in result:
+            alarms = [Alarm(**i) for i in batch["paginatedResults"]]
+            total = batch["totalCount"][0]["count"] if batch["totalCount"] else 0
+
         responses = []
 
         unique_pairs = set([alarm.pair_id for alarm in alarms])
@@ -78,6 +97,7 @@ async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(
                     base_asset_image_url=pair.base_asset_image_url,
                     quote_asset_image_url=pair.quote_asset_image_url,
                     created_since=calculate_time_elapse(alarm.created_at),
+                    closed_since=calculate_time_elapse(alarm.closed_at),  # type: ignore
                     price=alarm.price,
                     base_asset_scale=alarm.base_asset_scale,
                     quote_asset_scale=alarm.quote_asset_scale,
@@ -98,7 +118,7 @@ async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(
         )
 
 
-@CoreRouter.get("/alarms/active", response_model=PageResponse[AlarmResponse])
+@CoreRouter.get("/alarms/active", response_model=PageResponse[AlarmResponse], description="Get all active alarms with non-zero remain scale")
 async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends(get_db), p: Pagination = Depends(get_pagination)):
     try:
         # get pair by pair_id
@@ -110,9 +130,19 @@ async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends
             )
         pair = Pair(**pair_raw)
         # find alarms with pair_id
-        alarms = manager.db["alarms"].find({"pair_id": {"$eq": pair_id}, "status": {"$ne": "closed"}, "remain_scale": {"$gt": 0}}).sort("alarm_id", -1).limit(p.limit).skip(p.skip)
-        alarms = [Alarm(**i) for i in alarms]
-        total = manager.db["alarms"].count_documents({"pair_id": {"$eq": pair_id}, "status": {"$ne": "closed"}})
+        pipeline = [
+            {"$match": {"pair_id": {"$eq": pair_id}, "status": {"$ne": "closed"}, "remain_scale": {"$gt": 0}}},
+            {"$sort": {"alarm_id": -1}},
+            {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
+        ]
+
+        result = manager.db["alarms"].aggregate(pipeline)
+        alarms = []
+        total = 0
+        for batch in result:
+            alarms = [Alarm(**i) for i in batch["paginatedResults"]]
+            total = batch["totalCount"][0]["count"] if batch["totalCount"] else 0
+
         responses = []
         for alarm in alarms:
             responses.append(
