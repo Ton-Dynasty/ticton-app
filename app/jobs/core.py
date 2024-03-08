@@ -123,7 +123,7 @@ async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams
     try:
         manager: DatabaseManager = kwargs["manager"]
 
-        old_alarm_raw = manager.db["alarms"].find_one({"id": params.alarm_id})
+        old_alarm_raw = manager.db["alarms"].find_one({"id": params.old_alarm_id})
         if old_alarm_raw is None:
             raise Exception("Old alarm does not exist")
         old_alarm = Alarm(**old_alarm_raw)
@@ -137,14 +137,14 @@ async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams
             oracle=Address(pair_info.oracle_address).to_string(False),
             created_at=datetime.fromtimestamp(params.created_at, tz=utc),
             closed_at=None,
-            price=params.new_base_asset_price,
+            price=params.new_price,
             base_asset_amount=old_alarm.base_asset_amount * 2,
             quote_asset_amount=old_alarm.quote_asset_amount * 2,
             min_base_asset_threshold=client.metadata.min_base_asset_threshold / 10**client.metadata.base_asset_decimals,
-            origin_remain_scale=2,  # TODO: check this
-            remain_scale=2,  # TODO: check this
-            base_asset_scale=2,  # TODO: check this
-            quote_asset_scale=2,  # TODO: check this
+            origin_remain_scale=params.new_remain_scale,
+            remain_scale=params.new_remain_scale,
+            base_asset_scale=params.new_remain_scale,
+            quote_asset_scale=params.new_remain_scale,
             status="active",
             reward=0.0,
             watchmaker=Address(params.timekeeper).to_string(False),
@@ -157,26 +157,27 @@ async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams
             upsert=True,
         )
 
-        if params.remain_scale == 0:
+        if params.old_remain_scale == 0:
             # update the old alarm status to "emptied" and remain scale
             manager.db["alarms"].update_one(
-                {"id": params.alarm_id},
-                {"$set": {"status": "emptied", "remain_scale": params.remain_scale}},
+                {"id": params.old_alarm_id},
+                {"$set": {"status": "emptied", "remain_scale": params.old_alarm_id}},
             )
         else:
             # update the old alarm remain scale
             manager.db["alarms"].update_one(
-                {"id": params.alarm_id},
-                {"$set": {"remain_scale": params.remain_scale}},
+                {"id": params.old_alarm_id},
+                {"$set": {"remain_scale": params.old_remain_scale}},
             )
 
         print(
-            "Wind Success | {ts} | {symbol} | old alarm #{old_alarm_id} | new alarm #{new_alarm_id} | new price {new_price}".format(
+            "Wind Success | {ts} | {symbol} | old alarm #{old_alarm_id} | old price {old_price} | new alarm #{new_alarm_id} | new price {new_price}".format(
                 ts=datetime.fromtimestamp(params.tx.now, tz=utc).astimezone(pytz.timezone("Asia/Taipei")).isoformat(),
                 symbol=f"{pair_info.base_asset_symbol}/{pair_info.quote_asset_symbol}",
-                old_alarm_id=params.alarm_id,
+                old_alarm_id=params.old_alarm_id,
+                old_price=params.old_price,
                 new_alarm_id=params.new_alarm_id,
-                new_price=params.new_base_asset_price,
+                new_price=params.new_price,
             )
         )
 
