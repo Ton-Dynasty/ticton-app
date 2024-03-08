@@ -9,7 +9,7 @@ from ticton import TicTonAsyncClient
 from app.providers import get_db
 from app.providers import get_cache
 from app.providers import get_scheduler
-from app.providers.manager import CacheManager, DatabaseManager
+from app.providers.manager import CacheManager, DatabaseManager, ScheduleManager
 from app.jobs.core import subscribe_oracle
 from app.jobs.price import get_exchanges, set_price
 from app.models.core import Asset, PriceFeed, CreatePairRequest
@@ -43,7 +43,7 @@ async def create_pair(
     request: CreatePairRequest,
     db: DatabaseManager = Depends(get_db),
     settings: Settings = Depends(get_settings),
-    scheduler: BaseScheduler = Depends(get_scheduler),
+    scheduler: ScheduleManager = Depends(get_scheduler),
 ):
     # TODO: only ton dynasty can create pair
     try:
@@ -73,7 +73,7 @@ async def create_pair(
         result = db.db["pairs"].insert_one(pair.model_dump())
         if result.acknowledged:
             print("Pair Created", pair)
-        scheduler.add_job(
+        scheduler.scheduler.add_job(
             subscribe_oracle,
             "date",
             next_run_time=datetime.now() + timedelta(seconds=5),
