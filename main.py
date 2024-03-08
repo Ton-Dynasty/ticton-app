@@ -61,7 +61,7 @@ async def lifespan(_: FastAPI):
         exchanges = get_exchanges()
         scheduler.scheduler.configure(jobstores=jobstores, job_defaults=job_defaults, timezone=timezone("Asia/Taipei"))
         if scheduler.scheduler.get_job("set_price") is None:
-            scheduler.scheduler.add_job(set_price, "interval", seconds=3, args=[exchanges], id="set_price", name="set_price", replace_existing=True)
+            scheduler.scheduler.add_job(set_price, "interval", seconds=4, args=[exchanges], id="set_price", name="set_price", replace_existing=True, max_instances=1)
         await init_subscriptions(manager, scheduler)
         scheduler.scheduler.start()
         yield

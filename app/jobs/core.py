@@ -161,7 +161,7 @@ async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams
             # update the old alarm status to "emptied" and remain scale
             manager.db["alarms"].update_one(
                 {"id": params.old_alarm_id},
-                {"$set": {"status": "emptied", "remain_scale": params.old_alarm_id}},
+                {"$set": {"status": "emptied", "remain_scale": 0}},
             )
         else:
             # update the old alarm remain scale
@@ -171,13 +171,14 @@ async def on_wind_success(client: TicTonAsyncClient, params: OnWindSuccessParams
             )
 
         print(
-            "Wind Success | {ts} | {symbol} | old alarm #{old_alarm_id} | old price {old_price} | new alarm #{new_alarm_id} | new price {new_price}".format(
+            "Wind Success | {ts} | {symbol} | old alarm #{old_alarm_id} | old price {old_price} | new alarm #{new_alarm_id} | new price {new_price} | arbitrage ratio {arbitrage_ratio}".format(
                 ts=datetime.fromtimestamp(params.tx.now, tz=utc).astimezone(pytz.timezone("Asia/Taipei")).isoformat(),
                 symbol=f"{pair_info.base_asset_symbol}/{pair_info.quote_asset_symbol}",
                 old_alarm_id=params.old_alarm_id,
                 old_price=params.old_price,
                 new_alarm_id=params.new_alarm_id,
                 new_price=params.new_price,
+                arbitrage_ratio=float(old_alarm.origin_remain_scale - params.old_remain_scale) / old_alarm.origin_remain_scale,
             )
         )
 
