@@ -1,5 +1,7 @@
 import json
-from typing import List
+from fastapi import Query
+from typing import List, Optional
+from datetime import datetime
 from urllib import response
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
@@ -63,9 +65,24 @@ async def get_leader_board(
 async def get_leader_board_pagination(
     manager: DatabaseManager = Depends(get_db),
     p: Pagination = Depends(get_pagination),
+    start_time: Optional[datetime] = Query(None, description="Start time for filtering records in UTC"),
+    end_time: Optional[datetime] = Query(None, description="End time for filtering records in UTC"),
 ):
     try:
-        pipeline = [
+        match_stage = {}
+        if start_time and end_time:
+            match_stage = {"created_at": {"$gte": start_time, "$lte": end_time}}
+        elif start_time:
+            match_stage = {"created_at": {"$gte": start_time}}
+        elif end_time:
+            match_stage = {"created_at": {"$lte": end_time}}
+
+        # Insert the match stage before sorting if there are any conditions to match
+        pipeline = []
+        if match_stage:
+            pipeline.append({"$match": match_stage})
+
+        pipeline += [
             {"$sort": {"reward": -1}},
             {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
         ]
