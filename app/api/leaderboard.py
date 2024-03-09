@@ -1,13 +1,17 @@
 import json
 from typing import List
+from urllib import response
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import Json
+from app.models.common import Pagination
 from app.providers import get_cache, get_db
 from app.providers.manager import CacheManager, DatabaseManager
 from app.models.leaderboard import LeaderboardRecord, LeaderboardRecordList, LeaderboardResponse, LeaderboardRecordResponse
 from pytoncenter.address import Address
+
+from app.utils import get_pagination
 
 LeaderBoardRouter = APIRouter(prefix="/leaderboard", tags=["leaderboard"])
 
@@ -51,5 +55,22 @@ async def get_leader_board(
         result = {"current_address": my_address, "current_reward": round(user_reward, 4), "current_rank": user_rank, "leaderboard": leaderboard_response}
 
         return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(LeaderboardResponse(**result)))
+    except Exception as e:
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
+
+
+@LeaderBoardRouter.get("/debug", response_model=List[LeaderboardRecord], description="Get leaderboard records with pagination")
+async def get_leader_board_pagination(
+    manager: DatabaseManager = Depends(get_db),
+    p: Pagination = Depends(get_pagination),
+):
+    try:
+        pipeline = [
+            {"$sort": {"reward": -1}},
+            {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
+        ]
+
+        result = manager.db["leaderboard"].aggregate(pipeline)
+        return [LeaderboardRecordResponse(address=r["address"], rank=(i + 1) + p.skip, reward=round(r["reward"], 5)) for i, r in enumerate(result)]
     except Exception as e:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
