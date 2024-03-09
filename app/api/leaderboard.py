@@ -65,17 +65,17 @@ async def get_leader_board(
 async def get_leader_board_pagination(
     manager: DatabaseManager = Depends(get_db),
     p: Pagination = Depends(get_pagination),
-    start_time: Optional[datetime] = Query(None, description="Start time for filtering records in UTC"),
-    end_time: Optional[datetime] = Query(None, description="End time for filtering records in UTC"),
+    start_time: Optional[datetime] = Query(None, description="Start time for filtering records in UTC", example="2024-02-28T00:00:00+08:00"),
+    end_time: Optional[datetime] = Query(None, description="End time for filtering records in UTC", example="2024-03-08T23:59:59+08:00"),
 ):
     try:
         match_stage = {}
         if start_time and end_time:
-            match_stage = {"created_at": {"$gte": start_time, "$lte": end_time}}
+            match_stage = {"created_at": {"$gte": start_time.timestamp(), "$lte": end_time.timestamp()}}
         elif start_time:
-            match_stage = {"created_at": {"$gte": start_time}}
+            match_stage = {"created_at": {"$gte": start_time.timestamp()}}
         elif end_time:
-            match_stage = {"created_at": {"$lte": end_time}}
+            match_stage = {"created_at": {"$lte": end_time.timestamp()}}
 
         # Insert the match stage before sorting if there are any conditions to match
         pipeline = []
