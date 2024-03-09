@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from pydantic import Json
-from app.models.common import Pagination
+from app.models.common import PageResponse, Pagination
 from app.providers import get_cache, get_db
 from app.providers.manager import CacheManager, DatabaseManager
 from app.models.leaderboard import LeaderboardRecord, LeaderboardRecordList, LeaderboardResponse, LeaderboardRecordResponse
@@ -59,7 +59,7 @@ async def get_leader_board(
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
 
 
-@LeaderBoardRouter.get("/debug", response_model=List[LeaderboardRecord], description="Get leaderboard records with pagination")
+@LeaderBoardRouter.get("/debug", response_model=PageResponse[LeaderboardRecord], description="Get leaderboard records with pagination")
 async def get_leader_board_pagination(
     manager: DatabaseManager = Depends(get_db),
     p: Pagination = Depends(get_pagination),
@@ -69,8 +69,12 @@ async def get_leader_board_pagination(
             {"$sort": {"reward": -1}},
             {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
         ]
-
         result = manager.db["leaderboard"].aggregate(pipeline)
-        return [LeaderboardRecordResponse(address=r["address"], rank=(i + 1) + p.skip, reward=round(r["reward"], 5)) for i, r in enumerate(result)]
+        leaderboard_records = []
+        total = 0
+        for batch in result:
+            leaderboard_records = [LeaderboardRecord(**b, rank=(i + 1) + p.skip) for i, b in enumerate(batch["paginatedResults"])]
+            total = batch["totalCount"][0]["count"] if batch["totalCount"] else 0
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(PageResponse[LeaderboardRecord](items=leaderboard_records, total=total)))
     except Exception as e:
         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"message": str(e)})
