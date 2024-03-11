@@ -96,6 +96,8 @@ async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(
                 AlarmResponse(
                     base_asset_image_url=pair.base_asset_image_url,
                     quote_asset_image_url=pair.quote_asset_image_url,
+                    base_asset_symbol=pair.base_asset_symbol,
+                    quote_asset_symbol=pair.quote_asset_symbol,
                     created_since=calculate_time_elapse(alarm.created_at),
                     closed_since=calculate_time_elapse(alarm.closed_at),  # type: ignore
                     price=alarm.price,
