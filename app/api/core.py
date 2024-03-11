@@ -4,8 +4,6 @@ from app.providers import DatabaseManager, get_cache, get_db, get_scheduler
 from app.models.common import PageResponse, Pagination
 from app.models.core import Alarm, AlarmResponse, Pair
 from fastapi.encoders import jsonable_encoder
-from typing import List
-from ticton import TicTonAsyncClient
 from pytoncenter.address import Address
 from app.providers.manager import CacheManager
 from app.utils import get_pagination, calculate_time_elapse
@@ -44,6 +42,8 @@ async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(
                 AlarmResponse(
                     base_asset_image_url=pair.base_asset_image_url,
                     quote_asset_image_url=pair.quote_asset_image_url,
+                    base_asset_symbol=pair.base_asset_symbol,
+                    quote_asset_symbol=pair.quote_asset_symbol,
                     created_since=calculate_time_elapse(alarm.created_at),
                     price=alarm.price,
                     base_asset_scale=alarm.base_asset_scale,
@@ -149,6 +149,8 @@ async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends
                 AlarmResponse(
                     base_asset_image_url=pair.base_asset_image_url,
                     quote_asset_image_url=pair.quote_asset_image_url,
+                    base_asset_symbol=pair.base_asset_symbol,
+                    quote_asset_symbol=pair.quote_asset_symbol,
                     created_since=calculate_time_elapse(alarm.created_at),
                     price=alarm.price,
                     base_asset_scale=alarm.base_asset_scale,
