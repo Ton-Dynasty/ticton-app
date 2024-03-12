@@ -32,7 +32,7 @@ async def get_leader_board(
             top_10_records = LeaderboardRecordList(**top_10_records)
         else:
             top_10_records_raw = manager.db["leaderboard"].find().sort("reward", -1).limit(10)
-            top_10_records = LeaderboardRecordList(leaderboard=[LeaderboardRecord(**i) for i in top_10_records_raw])
+            top_10_records = LeaderboardRecordList(leaderboard=[LeaderboardRecord(**r, rank=i + 1) for i, r in enumerate(top_10_records_raw)])
             cache.client.set("leaderboard_top_10", top_10_records.model_dump_json(), ex=60)
 
         if len(top_10_records.leaderboard) == 0:
