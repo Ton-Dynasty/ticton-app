@@ -59,9 +59,10 @@ async def set_price(exchanges: List[Exchange]):
     for source, symbol, price in results:
         if price is None:
             continue
-        feed = PriceFeed(source=source or "", price=price, last_updated_at=datetime.now(), symbol=symbol)
+        # TODO: Hard coded the price to 4 decimal places, should be configurable in the future
+        feed = PriceFeed(source=source or "", price=round(price, 4), last_updated_at=datetime.now(), symbol=symbol)
         resp = cache.client.set(name=f"price${source}${symbol}", value=feed.model_dump_json())
         if not resp:
             logger.error(f"Failed to set price for {source}:{symbol}")
     for exchange in exchanges:
-        await exchange.close() # type: ignore
+        await exchange.close()  # type: ignore
