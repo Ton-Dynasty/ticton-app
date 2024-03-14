@@ -17,12 +17,32 @@ from app.models.core import Pair
 from ticton import TicTonAsyncClient
 from apscheduler.schedulers.base import BaseScheduler
 from app.settings import Settings, get_settings
-from app.tools import get_ticton_client
+from app.tools import get_ticton_client, get_ton_center_client
 from pytoncenter.address import Address
 from pytoncenter import get_client
-from pytoncenter.v3.models import GetSpecifiedJettonWalletRequest
+from pytoncenter.v3.models import GetSpecifiedJettonWalletRequest, RunGetMethodRequest, GetMethodParameterInput
+
 
 AssetRouter = APIRouter(prefix="/asset", tags=["asset"])
+
+
+@AssetRouter.get("/jetton_wallet", description="Get jetton wallet address")
+async def get_jetton_wallet(
+    user_wallet: str,
+    jetton_master_addr: str = "kQBqSpvo4S87mX9tjHaG4zhYZeORhVhMapBJpnMZ64jhrP-A",
+    settings: Settings = Depends(get_settings),
+):
+    try:
+        toncenter = await get_ton_center_client(settings)
+        wallet = await toncenter.get_jetton_wallets(GetSpecifiedJettonWalletRequest(owner_address=user_wallet, jetton_address=jetton_master_addr))
+        if wallet is None:
+            return JSONResponse(status_code=status.HTTP_200_OK, content={"msg": "Please get some test usdt from faucet"})
+        return JSONResponse(status_code=status.HTTP_200_OK, content=wallet.model_dump())
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"message": str(e)},
+        )
 
 
 @AssetRouter.get("/pairs", response_model=List[Pair], description="Get available pairs")
