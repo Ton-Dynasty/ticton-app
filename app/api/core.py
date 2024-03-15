@@ -18,10 +18,12 @@ async def get_my_active_alarms(address: str, manager: DatabaseManager = Depends(
         my_address = Address(address).to_string(False)
         pipeline = [
             {"$match": {"watchmaker": {"$eq": my_address}, "status": {"$ne": "closed"}}},
-            {"$sort": {"alarm_id": -1}},
-            {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
+            {"$sort": {"id": -1}},
+            {"$facet": {
+                "paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}],
+                "totalCount": [{"$count": "count"}]
+            }},
         ]
-
         result = manager.db["alarms"].aggregate(pipeline)
         alarms = []
         total = 0
@@ -72,7 +74,7 @@ async def get_my_closed_alarms(address: str, manager: DatabaseManager = Depends(
         # find alarms with telegram_id, and status is closed
         pipeline = [
             {"$match": {"watchmaker": {"$eq": my_address}, "status": {"$eq": "closed"}}},
-            {"$sort": {"alarm_id": -1}},
+            {"$sort": {"id": -1}},
             {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
         ]
 
@@ -134,7 +136,7 @@ async def get_alarms_by_pair_id(pair_id: str, manager: DatabaseManager = Depends
         # find alarms with pair_id
         pipeline = [
             {"$match": {"pair_id": {"$eq": pair_id}, "status": {"$ne": "closed"}, "remain_scale": {"$gt": 0}}},
-            {"$sort": {"alarm_id": -1}},
+            {"$sort": {"id": -1}},
             {"$facet": {"paginatedResults": [{"$skip": p.skip}, {"$limit": p.limit}], "totalCount": [{"$count": "count"}]}},
         ]
 
