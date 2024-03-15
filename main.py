@@ -90,9 +90,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.dependency_overrides[get_db] = get_db
-app.include_router(CoreRouter, prefix="/api/v1")
-app.include_router(AssetRouter, prefix="/api/v1")
-app.include_router(LeaderBoardRouter, prefix="/api/v1")
+app.include_router(CoreRouter)
+app.include_router(AssetRouter)
+app.include_router(LeaderBoardRouter)
 
 
 async def setup():
